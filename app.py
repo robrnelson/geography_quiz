@@ -31,12 +31,15 @@ if "target_country" not in st.session_state:
     st.session_state.target_country = random.choice(country_names)
 if "message" not in st.session_state:
     st.session_state.message = ""
+if "message_type" not in st.session_state:
+    st.session_state.message_type = "info"
 if "selected_country" not in st.session_state:
     st.session_state.selected_country = None
 
 def next_country():
     st.session_state.target_country = random.choice(country_names)
     st.session_state.message = ""
+    st.session_state.message_type = "info"
     st.session_state.selected_country = None
 
 # 3. UI Header & Game Mode Dropdown
@@ -51,7 +54,15 @@ show_borders = (game_mode == "With white borders")
 
 st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
 st.markdown(f"**Score:** {st.session_state.score}")
-st.write(st.session_state.message)
+
+# Display dynamic feedback boxes
+if st.session_state.message:
+    if st.session_state.message_type == "success":
+        st.success(st.session_state.message)
+    elif st.session_state.message_type == "error":
+        st.error(st.session_state.message)
+else:
+    st.info("📍 Click a country on the globe, then click Submit.")
 
 # Action Buttons
 col1, col2 = st.columns(2)
@@ -75,8 +86,13 @@ fig = px.choropleth(
     hover_data={"val": False, "name": False}
 )
 
-# Disable hover tooltips completely
-fig.update_traces(hoverinfo="none", hovertemplate=None)
+# Disable hover tooltips and dynamically control polygon outlines based on mode
+fig.update_traces(
+    hoverinfo="none", 
+    hovertemplate=None,
+    marker_line_width=1 if show_borders else 0,
+    marker_line_color="white" if show_borders else "rgba(0,0,0,0)"
+)
 
 # Style globe with dynamic border settings
 fig.update_geos(
@@ -109,7 +125,7 @@ event = st.plotly_chart(
     key="globe_view"
 )
 
-# 6. Handle Selection Updates from Map Interaction (Silently tracked)
+# 6. Handle Selection Updates from Map Interaction
 if event and "selection" in event and "points" in event["selection"]:
     points = event["selection"]["points"]
     if points:
@@ -122,11 +138,13 @@ if submit_clicked:
     if st.session_state.selected_country:
         if st.session_state.selected_country == st.session_state.target_country:
             st.session_state.score += 1
-            st.session_state.message = f"✅ **Correct!** That was {st.session_state.selected_country}."
+            st.session_state.message = f"🎉 **Correct!** That was indeed {st.session_state.selected_country}. Moving to next country..."
+            st.session_state.message_type = "success"
             next_country()
             st.rerun()
         else:
             st.session_state.message = f"❌ **Incorrect.** You selected {st.session_state.selected_country}. Try again!"
+            st.session_state.message_type = "error"
             st.rerun()
     else:
         st.warning("Please click a country on the globe first before submitting!")
