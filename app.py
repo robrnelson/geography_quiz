@@ -36,10 +36,8 @@ if "message_type" not in st.session_state:
 if "selected_country" not in st.session_state:
     st.session_state.selected_country = None
 
-def next_country():
+def reset_selection_and_target():
     st.session_state.target_country = random.choice(country_names)
-    st.session_state.message = ""
-    st.session_state.message_type = "info"
     st.session_state.selected_country = None
 
 # 3. UI Header & Game Mode Dropdown
@@ -70,7 +68,9 @@ with col1:
     submit_clicked = st.button("Submit Guess", type="primary", use_container_width=True)
 with col2:
     if st.button("Skip / Next Country", use_container_width=True):
-        next_country()
+        st.session_state.message = ""
+        st.session_state.message_type = "info"
+        reset_selection_and_target()
         st.rerun()
 
 # 4. Create the 3D Orthographic Globe using Plotly
@@ -132,15 +132,18 @@ if event and "selection" in event and "points" in event["selection"]:
         clicked = points[0].get("location")
         if clicked and clicked != st.session_state.selected_country:
             st.session_state.selected_country = clicked
+            # Clear previous message when making a new selection
+            st.session_state.message = ""
+            st.session_state.message_type = "info"
 
 # 7. Process Submission Logic
 if submit_clicked:
     if st.session_state.selected_country:
         if st.session_state.selected_country == st.session_state.target_country:
             st.session_state.score += 1
-            st.session_state.message = f"🎉 **Correct!** That was indeed {st.session_state.selected_country}. Moving to next country..."
+            st.session_state.message = f"🎉 **Correct!** That was indeed {st.session_state.selected_country}!"
             st.session_state.message_type = "success"
-            next_country()
+            reset_selection_and_target()
             st.rerun()
         else:
             st.session_state.message = f"❌ **Incorrect.** You selected {st.session_state.selected_country}. Try again!"
