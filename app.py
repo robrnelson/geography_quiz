@@ -104,23 +104,26 @@ fig = px.choropleth(
     hover_data={"val": False, "name": False}
 )
 
-# Disable hover tooltips completely
+# Disable hover tooltips and freeze selection styling so colors never shift/fade
 fig.update_traces(
     hoverinfo="none", 
     hovertemplate=None,
     marker_line_width=1 if show_borders else 0,
-    marker_line_color="white" if show_borders else "rgba(0,0,0,0)"
+    marker_line_color="white" if show_borders else "rgba(0,0,0,0)",
+    selected=dict(marker=dict(opacity=1)),
+    unselected=dict(marker=dict(opacity=1))
 )
 
-# If in "Without borders" mode and a country is selected, drop a pin on it
+# If in "Without borders" mode and a country is selected, drop a Google Maps-style pin (📍) on it
 if not show_borders and st.session_state.selected_country:
     selected_row = df[df["name"] == st.session_state.selected_country]
     if not selected_row.empty:
         fig.add_trace(go.Scattergeo(
             lat=selected_row["lat"],
             lon=selected_row["lon"],
-            mode="markers",
-            marker=dict(size=10, color="red", symbol="circle"),
+            mode="text",
+            text=["📍"],
+            textfont=dict(size=26),
             hoverinfo="none"
         ))
 
