@@ -1,192 +1,42 @@
 import streamlit as st
-import plotly.express as px
-import plotly.graph_objects as go
-import requests
-import random
-import pandas as pd
+import streamlit.components.v1 as components
+from geopy.distance import geodesic
+import os
 
-# Page config
-st.set_page_config(page_title="3D Globe Quiz", layout="wide")
+st.set_page_config(page_title="Blue Marble Quiz", layout="wide")
 
-# 1. Load Country Data & Compute Centroids for Pins
-@st.cache_data
-def load_data():
-    url = "https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json"
-    response = requests.get(url)
-    data = response.json()
+# 1. Connect Python to the HTML/JS Frontend
+parent_dir = os.path.dirname(os.path.abspath(__file__))
+frontend_dir = os.path.join(parent_dir, "frontend")
+globe_component = components.declare_component("blue_marble", path=frontend_dir)
+
+# 2. Set Up the Game State
+st.title("🌍 MapTap Clone: Blue Marble Edition")
+
+# A simple target (You can expand this into a daily list later)
+target = {"name": "The Great Pyramid of Giza", "lat": 29.9792, "lon": 31.1342}
+
+st.markdown(f"### 🎯 Find: **{target['name']}**")
+
+# 3. Render the Globe and Capture Clicks
+# This component returns the dictionary {lat, lon} sent from JavaScript
+click_data = globe_component(key="globe_view")
+
+# 4. Scoring Logic (MapTap Style)
+if click_data:
+    click_lat = click_data["lat"]
+    click_lon = click_data["lon"]
     
-    # Filter out Antarctica
-    data["features"] = [f for f in data["features"] if f["properties"]["name"] != "Antarctica"]
+    # Calculate precise distance over the curve of the Earth
+    distance_km = geodesic((click_lat, click_lon), (target["lat"], target["lon"])).km
     
-    countries = []
-    for f in data["features"]:
-        name = f["properties"]["name"]
-        geom = f["geometry"]
-        
-        lons, lats = [], []
-        def parse_coords(coords):
-            if isinstance(coords[0], (list, tuple)):
-                for sub in coords:
-                    parse_coords(sub)
-            else:
-                lons.append(coords[0])
-                lats.append(coords[1])
-        parse_coords(geom["coordinates"])
-        
-        lat = sum(lats) / len(lats) if lats else 0
-        lon = sum(lons) / len(lons) if lons else 0
-        countries.append({"name": name, "lat": lat, "lon": lon})
-        
-    return pd.DataFrame(countries), data
-
-df, geojson_data = load_data()
-country_names = df["name"].tolist()
-
-# 2. Initialize Session State
-if "score" not in st.session_state:
-    st.session_state.score = 0
-if "target_country" not in st.session_state:
-    st.session_state.target_country = random.choice(country_names)
-if "message" not in st.session_state:
-    st.session_state.message = ""
-if "message_type" not in st.session_state:
-    st.session_state.message_type = "info"
-if "selected_country" not in st.session_state:
-    st.session_state.selected_country = None
-
-def reset_selection_and_target():
-    st.session_state.target_country = random.choice(country_names)
-    st.session_state.selected_country = None
-
-# 3. UI Header & Game Mode Dropdown
-st.title("🌍 3D Blue Marble Geography Quiz")
-
-game_mode = st.selectbox(
-    "Choose Border Mode:", 
-    ["Without borders", "With white borders"]
-)
-show_borders = (game_mode == "With white borders")
-
-st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
-st.markdown(f"**Score:** {st.session_state.score}")
-
-# Display dynamic feedback boxes
-if st.session_state.message:
-    if st.session_state.message_type == "success":
-        st.success(st.session_state.message)
-    elif st.session_state.message_type == "error":
-        st.error(st.session_state.message)
-else:
-    st.info("📍 Click a country on the globe, then click Submit.")
-
-# Action Buttons
-col1, col2 = st.columns(2)
-with col1:
-    submit_clicked = st.button("Submit Guess", type="primary", use_container_width=True)
-with col2:
-    if st.button("Skip / Next Country", use_container_width=True):
-        st.session_state.message = ""
-        st.session_state.message_type = "info"
-        reset_selection_and_target()
-        st.rerun()
-
-# 4. Create the 3D Orthographic Globe using Plotly
-df["val"] = 1  
-fig = px.choropleth(
-    df,
-    geojson=geojson_data,
-    locations="name",
-    featureidkey="properties.name",
-    color="val",
-    color_continuous_scale=[[0, "rgb(25, 60, 40)"], [1, "rgb(35, 75, 48)"]],
-    hover_name=None,
-    hover_data={"val": False, "name": False}
-)
-
-# Disable hover tooltips and freeze selection styling so colors never shift/fade
-fig.update_traces(
-    hoverinfo="none", 
-    hovertemplate=None,
-    marker_line_width=1 if show_borders else 0,
-    marker_line_color="white" if show_borders else "rgba(0,0,0,0)",
-    selected=dict(marker=dict(opacity=1)),
-    unselected=dict(marker=dict(opacity=1))
-)
-
-# Determine pin coordinates (empty if no country is selected to keep structure constant)
-pin_lat, pin_lon = [], []
-if not show_borders and st.session_state.selected_country:
-    selected_row = df[df["name"] == st.session_state.selected_country]
-    if not selected_row.empty:
-        pin_lat = selected_row["lat"].tolist()
-        pin_lon = selected_row["lon"].tolist()
-
-# Always add the pin trace so the figure structure never changes (prevents view resets)
-fig.add_trace(go.Scattergeo(
-    lat=pin_lat,
-    lon=pin_lon,
-    mode="text",
-    text=["📍"] if pin_lat else [""],
-    textfont=dict(size=26),
-    hoverinfo="none"
-))
-
-# Style globe with clear-sky satellite imagery color profile
-fig.update_geos(
-    projection_type="orthographic",
-    showocean=True,
-    oceancolor="rgb(8, 22, 53)",     # Deep clear-sky satellite ocean blue
-    showland=True,
-    landcolor="rgb(28, 62, 42)",     # Natural satellite forest green
-    showcountries=show_borders,
-    countrycolor="white",
-    showcoastlines=show_borders,
-    coastlinecolor="white",
-    showlakes=False,
-    showrivers=False,
-    bgcolor="rgba(0,0,0,0)"
-)
-
-fig.update_layout(
-    height=600,
-    margin={"r":0, "t":0, "l":0, "b":0},
-    coloraxis_showscale=False,
-    showlegend=False,
-    uirevision="static_globe_view"  # Locks camera position and prevents resetting on reruns
-)
-
-# 5. Render Globe and Capture Clicks
-event = st.plotly_chart(
-    fig, 
-    on_select="rerun", 
-    selection_mode="points", 
-    use_container_width=True,
-    key="globe_view"
-)
-
-# 6. Handle Selection Updates from Map Interaction
-if event and "selection" in event and "points" in event["selection"]:
-    points = event["selection"]["points"]
-    if points:
-        clicked = points[0].get("location")
-        if clicked and clicked != st.session_state.selected_country:
-            st.session_state.selected_country = clicked
-            st.session_state.message = ""
-            st.session_state.message_type = "info"
-            st.rerun()
-
-# 7. Process Submission Logic
-if submit_clicked:
-    if st.session_state.selected_country:
-        if st.session_state.selected_country == st.session_state.target_country:
-            st.session_state.score += 1
-            st.session_state.message = f"🎉 **Correct!** That was indeed {st.session_state.selected_country}!"
-            st.session_state.message_type = "success"
-            reset_selection_and_target()
-            st.rerun()
-        else:
-            st.session_state.message = f"❌ **Incorrect.** You selected {st.session_state.selected_country}. Try again!"
-            st.session_state.message_type = "error"
-            st.rerun()
+    # Simple scoring algorithm: Max 5000 points, lose 1 point per km off
+    score = max(0, int(5000 - distance_km))
+    
+    st.divider()
+    if distance_km < 100:
+        st.success(f"**Incredible!** You were only {distance_km:.0f} km away. Score: {score}/5000")
     else:
-        st.warning("Please click a country on the globe first before submitting!")
+        st.warning(f"**Not quite.** You were {distance_km:.0f} km away. Score: {score}/5000")
+        
+    st.info(f"📍 Your tap: {click_lat:.2f}, {click_lon:.2f} | Target: {target['lat']:.2f}, {target['lon']:.2f}")
