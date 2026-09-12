@@ -23,7 +23,6 @@ def load_data():
         name = f["properties"]["name"]
         geom = f["geometry"]
         
-        # Helper to extract coordinates and compute a center point
         lons, lats = [], []
         def parse_coords(coords):
             if isinstance(coords[0], (list, tuple)):
@@ -99,8 +98,7 @@ fig = px.choropleth(
     locations="name",
     featureidkey="properties.name",
     color="val",
-    # Blue-green satellite spectrum mapping for land
-    color_continuous_scale=[[0, "rgb(31, 65, 48)"], [1, "rgb(40, 78, 58)"]],
+    color_continuous_scale=[[0, "rgb(25, 60, 40)"], [1, "rgb(35, 75, 48)"]],
     hover_name=None,
     hover_data={"val": False, "name": False}
 )
@@ -115,26 +113,31 @@ fig.update_traces(
     unselected=dict(marker=dict(opacity=1))
 )
 
-# If in "Without borders" mode and a country is selected, drop a Google Maps-style pin (📍) on it
+# Determine pin coordinates (empty if no country is selected to keep structure constant)
+pin_lat, pin_lon = [], []
 if not show_borders and st.session_state.selected_country:
     selected_row = df[df["name"] == st.session_state.selected_country]
     if not selected_row.empty:
-        fig.add_trace(go.Scattergeo(
-            lat=selected_row["lat"],
-            lon=selected_row["lon"],
-            mode="text",
-            text=["📍"],
-            textfont=dict(size=26),
-            hoverinfo="none"
-        ))
+        pin_lat = selected_row["lat"].tolist()
+        pin_lon = selected_row["lon"].tolist()
 
-# Style globe with true Blue Marble satellite aesthetic
+# Always add the pin trace so the figure structure never changes (prevents view resets)
+fig.add_trace(go.Scattergeo(
+    lat=pin_lat,
+    lon=pin_lon,
+    mode="text",
+    text=["📍"] if pin_lat else [""],
+    textfont=dict(size=26),
+    hoverinfo="none"
+))
+
+# Style globe with clear-sky satellite imagery color profile
 fig.update_geos(
     projection_type="orthographic",
     showocean=True,
-    oceancolor="rgb(11, 27, 61)",  # Deep sapphire blue marble ocean
+    oceancolor="rgb(8, 22, 53)",     # Deep clear-sky satellite ocean blue
     showland=True,
-    landcolor="rgb(31, 65, 48)",    # Natural satellite earth green
+    landcolor="rgb(28, 62, 42)",     # Natural satellite forest green
     showcountries=show_borders,
     countrycolor="white",
     showcoastlines=show_borders,
@@ -149,7 +152,7 @@ fig.update_layout(
     margin={"r":0, "t":0, "l":0, "b":0},
     coloraxis_showscale=False,
     showlegend=False,
-    uirevision="active"  # Preserves user rotation/zoom state across reruns
+    uirevision="static_globe_view"  # Locks camera position and prevents resetting on reruns
 )
 
 # 5. Render Globe and Capture Clicks
