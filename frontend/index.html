@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: transparent;
+  }
+  #wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  svg {
+    touch-action: none;
+    cursor: grab;
+  }
+  svg.dragging {
+    cursor: grabbing;
+  }
+  path.country {
+    stroke-width: 0.4;
+  }
+</style>
+</head>
+<body>
+<div id="wrap"><svg id="globe"></svg></div>
+<script>
+  // ---- minimal Streamlit component protocol (no build step / no npm) ----
+  function sendToStreamlit(type, data) {
+    const payload = Object.assign({ isStreamlitMessage: true, type: type }, data);
+    window.parent.postMessage(payload, "*");
+  }
+  function componentReady() {
+    sendToStreamlit("streamlit:componentReady", { apiVersion: 1 });
+  }
+  function setFrameHeight(height) {
+    sendToStreamlit("streamlit:setFrameHeight", { height: height });
+  }
+  function sendValue(value) {
+    sendToStreamlit("streamlit:setComponentValue", { value: value, dataType: "json" });
+  }
+
+  // ---- state ----
+  let countries = [];
+  let landColor = "#3a7d44";
+  let oceanColor = "#1b4f72";
+  let highlightColor = "#f4d35e";
+  let highlightId = null;
+  let size = 600;
+  let R = 280;
+  let cx = 300, cy = 300;
+
+  // rotation persists across re-renders (Streamlit re-sends args on every
+  // app rerun, but this script keeps running in the same iframe, so we
+  // only set an initial rotation once)
+  let rotLambda = 0.4;   // radians
+  let rotPhi = -0.35;    // radians
+
+  const svg = document.getElementById("globe");
+  const wrap = document.getElementById("wrap");
+  let firstRender = true;
+
+  function toXYZ(lonDeg, latDeg) {
+    const lambda = (lonDeg * Math.PI) / 180 - rotLambda;
+    const phi = (latDeg * Math.PI) / 180;
+    const phi0 = rotPhi;
+    const X = Math.cos(phi) * Math.sin(lambda);
+    const Y = Math.cos(phi0) * Math.sin(phi) - Math.sin(phi0) * Math.cos(phi) * Math.cos(lambda);
+    const Z = Math.sin(phi0) * Math.sin(phi) + Math.cos(phi0) * Math.cos(phi) * Math.cos(lambda);
+    return [X, Y, Z];
+  }
+
+  function intersectAtHorizon(a, b) {
+    const t = a[2] / (a[2] - b[2]);
+    let X = a[0] + t * (b[0] - a[0]);
+    let Y = a[1] + t * (b[1] - a[1]);
+    const norm = Math.sqrt(X * X + Y * Y) || 1;
+    return [X / norm, Y / norm, 0];
+  }
+
+  // Sutherland-Hodgman clip of a closed ring against the visible
+  // hemisphere (Z >= 0), operating directly on rotated unit-sphere coords
+  function clipRing(pts3d) {
+    const out = [];
+    const n = pts3d.length;
+    if (n === 0) return out;
+    for (let i = 0; i < n; i++) {
+      const curr = pts3d[i];
+      const prev = pts3d[(i - 1 + n) % n];
+      const currIn = curr[2] >= 0;
+      const prevIn = prev[2] >= 0;
+      if (currIn) {
+        if (!prevIn) out.push(intersectAtHorizon(prev, curr));
+        out.push(curr);
+      } else if (prevIn) {
+        out.push(intersectAtHorizon(prev, curr));
+      }
+    }
+    return out;
+  }
+
+  function ringToPathSegment(ring) {
+    const pts3d = ring.map(([lon, lat]) => toXYZ(lon, lat));
+    const clipped = clipRing(pts3d);
+    if (clipped.length < 3) return "";
+    let d = "";
+    clipped.forEach((p, i) => {
+      const x = (cx + R * p[0]).toFixed(1);
+      const y = (cy - R * p[1]).toFixed(1);
+      d += (i === 0 ? "M " : "L ") + x + " " + y + " ";
+    });
+    return d + "Z ";
+  }
+
+  function countryPathData(rings) {
+    let d = "";
+    for (const ring of rings) {
+      d += ringToPathSegment(ring);
+    }
+    return d;
+  }
+
+  function redraw() {
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    svg.setAttribute("viewBox", "0 0 " + size + " " + size);
+    svg.setAttribute("width", size);
+    svg.setAttribute("height", size);
+
+    const ns = "http://www.w3.org/2000/svg";
+
+    const ocean = document.createElementNS(ns, "circle");
+    ocean.setAttribute("cx", cx);
+    ocean.setAttribute("cy", cy);
+    ocean.setAttribute("r", R);
+    ocean.setAttribute("fill", oceanColor);
+    ocean.setAttribute("data-id", "");
+    ocean.setAttribute("class", "ocean");
+    svg.appendChild(ocean);
+
+    for (const c of countries) {
+      const d = countryPathData(c.rings);
+      if (!d) continue;
+      const path = document.createElementNS(ns, "path");
+      path.setAttribute("d", d);
+      path.setAttribute("fill-rule", "evenodd");
+      path.setAttribute("fill", c.id === highlightId ? highlightColor : landColor);
+      path.setAttribute("stroke", c.id === highlightId ? highlightColor : landColor);
+      path.setAttribute("class", "country");
+      path.setAttribute("data-id", c.id);
+      svg.appendChild(path);
+    }
+  }
+
+  // ---- drag to rotate + click to answer ----
+  let dragging = false;
+  let dragMoved = 0;
+  let lastX = 0, lastY = 0;
+  let rafPending = false;
+
+  function scheduleRedraw() {
+    if (rafPending) return;
+    rafPending = true;
+    requestAnimationFrame(() => {
+      rafPending = false;
+      redraw();
+    });
+  }
+
+  svg.addEventListener("pointerdown", (e) => {
+    dragging = true;
+    dragMoved = 0;
+    lastX = e.clientX;
+    lastY = e.clientY;
+    svg.classList.add("dragging");
+    svg.setPointerCapture(e.pointerId);
+  });
+
+  svg.addEventListener("pointermove", (e) => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    dragMoved += Math.abs(dx) + Math.abs(dy);
+    lastX = e.clientX;
+    lastY = e.clientY;
+
+    rotLambda -= dx * 0.006;
+    rotPhi += dy * 0.006;
+    const limit = Math.PI / 2 - 0.01;
+    if (rotPhi > limit) rotPhi = limit;
+    if (rotPhi < -limit) rotPhi = -limit;
+
+    scheduleRedraw();
+  });
+
+  function endDrag(e) {
+    if (!dragging) return;
+    dragging = false;
+    svg.classList.remove("dragging");
+
+    // a "click" is a pointer-up with negligible movement
+    if (dragMoved < 5) {
+      const target = e.target;
+      const id = target && target.getAttribute ? target.getAttribute("data-id") : null;
+      sendValue({ id: id ? id : null, nonce: Date.now() + Math.random() });
+    }
+  }
+
+  svg.addEventListener("pointerup", endDrag);
+  svg.addEventListener("pointercancel", endDrag);
+
+  // ---- Streamlit render protocol ----
+  window.addEventListener("message", (event) => {
+    if (!event.data || event.data.type !== "streamlit:render") return;
+    const args = event.data.args || {};
+
+    countries = args.countries || [];
+    landColor = args.land_color || landColor;
+    oceanColor = args.ocean_color || oceanColor;
+    highlightColor = args.highlight_color || highlightColor;
+    highlightId = args.highlight_id || null;
+    size = args.height || 600;
+    R = size * 0.47;
+    cx = size / 2;
+    cy = size / 2;
+
+    wrap.style.width = size + "px";
+    wrap.style.height = size + "px";
+
+    redraw();
+
+    if (firstRender) {
+      firstRender = false;
+      setFrameHeight(size);
+    }
+  });
+
+  componentReady();
+</script>
+</body>
+</html>
