@@ -46,12 +46,13 @@ if st.button("Skip / Next Country"):
     st.rerun()
 
 # 4. Setup PyDeck Layers
-# Esri Satellite Tiles for the label-free "blue marble" look
-tile_layer = pdk.Layer(
-    "TileLayer",
-    data="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
-    min_zoom=0,
-    max_zoom=19,
+
+# Wrap a single equirectangular Earth image around the globe
+# This avoids the WebGL tearing caused by XYZ tile layers on 3D spheres
+globe_layer = pdk.Layer(
+    "BitmapLayer",
+    image="https://upload.wikimedia.org/wikipedia/commons/c/c4/Earthmap1000x500compac.jpg",
+    bounds=[-180, -90, 180, 90],
     pickable=False
 )
 
@@ -64,8 +65,8 @@ geojson_layer = pdk.Layer(
     stroked=False,
     filled=True,
     extruded=False,
-    # Alpha channel is 1/255: mathematically it is there, visually it is invisible
-    get_fill_color=[0, 0, 0, 1],  
+    # 0 alpha means entirely transparent until hovered
+    get_fill_color=[255, 255, 255, 0],  
     pickable=True,
     auto_highlight=True,
     # Flashes a transparent white over the country when hovered
@@ -84,8 +85,9 @@ deck = pdk.Deck(
         min_zoom=0,
         max_zoom=10
     ),
-    layers=[tile_layer, geojson_layer],
-    map_provider=None, # Disable mapbox to ensure pure Esri tiles
+    # Swap out the tile layer for the new globe layer
+    layers=[globe_layer, geojson_layer],
+    map_provider=None, 
 )
 
 # 6. Render and capture clicks
