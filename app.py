@@ -9,10 +9,11 @@ How it works
   same "ocean" color, with no borders/labels drawn — just a plain globe
   you can drag to rotate, exactly like a blue-marble Earth.
 - A country name is shown in a box. You click anywhere on the globe;
-  Plotly's choropleth click event tells us the ISO-3 id of whatever
-  country polygon was actually clicked (this is what gives us free,
-  exact point-in-country-border hit testing — no manual polygon math
-  needed). We compare that id to the target and score accordingly.
+  Streamlit's native chart-click support (`st.plotly_chart(on_select=...)`)
+  tells us which polygon index was clicked, which we map back to the
+  ISO-3 id of that country — this is what gives us free, exact
+  point-in-country-border hit testing, no manual polygon math needed.
+  We compare that id to the target and score accordingly.
 
 Run with:
     pip install -r requirements.txt
@@ -24,7 +25,6 @@ import random
 import plotly.graph_objects as go
 import requests
 import streamlit as st
-from streamlit_plotly_events import plotly_events
 
 # --------------------------------------------------------------------------
 # Config
@@ -260,18 +260,21 @@ with col_side:
 
 with col_map:
     fig = build_figure()
-    clicked_points = plotly_events(
+    event = st.plotly_chart(
         fig,
-        click_event=True,
-        hover_event=False,
-        select_event=False,
-        override_height=650,
-        override_width="100%",
+        use_container_width=True,
+        on_select="rerun",
+        selection_mode="points",
         key=f"globe_{st.session_state.render_id}",
     )
+    st.caption("Ocean clicks won't register — click on a landmass.")
 
-if clicked_points:
-    location_id = clicked_points[0].get("location")
+points = (event or {}).get("selection", {}).get("points", []) if event else []
+if points:
+    idx = points[0].get("point_index")
+    if idx is None:
+        idx = points[0].get("pointIndex")
+    location_id = all_ids[idx] if idx is not None and 0 <= idx < len(all_ids) else None
     process_click(location_id)
     st.rerun()
 
