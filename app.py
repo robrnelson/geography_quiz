@@ -31,10 +31,13 @@ if "target_country" not in st.session_state:
     st.session_state.target_country = random.choice(country_names)
 if "message" not in st.session_state:
     st.session_state.message = ""
+if "selected_country" not in st.session_state:
+    st.session_state.selected_country = None
 
 def next_country():
     st.session_state.target_country = random.choice(country_names)
     st.session_state.message = ""
+    st.session_state.selected_country = None
 
 # 3. UI Header
 st.title("🌍 3D Blue Marble Geography Quiz")
@@ -42,9 +45,20 @@ st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
 st.markdown(f"**Score:** {st.session_state.score}")
 st.write(st.session_state.message)
 
-if st.button("Skip / Next Country"):
-    next_country()
-    st.rerun()
+# Display current selection feedback
+if st.session_state.selected_country:
+    st.info(f"📍 Currently Selected: **{st.session_state.selected_country}**")
+else:
+    st.info("📍 Click a country on the globe to select it, then click Submit.")
+
+# Action Buttons
+col1, col2 = st.columns(2)
+with col1:
+    submit_clicked = st.button("Submit Guess", type="primary", use_container_width=True)
+with col2:
+    if st.button("Skip / Next Country", use_container_width=True):
+        next_country()
+        st.rerun()
 
 # 4. Create the 3D Orthographic Globe using Plotly
 df["val"] = 1  # Uniform placeholder value for coloring
@@ -54,8 +68,13 @@ fig = px.choropleth(
     locations="name",
     featureidkey="properties.name",
     color="val",
-    color_continuous_scale=[[0, "rgb(30, 60, 100)"], [1, "rgb(35, 70, 110)"]]
+    color_continuous_scale=[[0, "rgb(30, 60, 100)"], [1, "rgb(35, 70, 110)"]],
+    hover_name=None,
+    hover_data={"val": False, "name": False}
 )
+
+# Disable hover tooltips completely so answers aren't revealed on mouseover
+fig.update_traces(hoverinfo="none", hovertemplate=None)
 
 # Style it to look like a clean blue marble globe with no borders or labels
 fig.update_geos(
@@ -64,15 +83,15 @@ fig.update_geos(
     oceancolor="rgb(10, 25, 45)",
     showland=True,
     landcolor="rgb(30, 50, 75)",
-    showcountries=False,  # No country borders
-    showcoastlines=False, # No coastlines
+    showcountries=False,
+    showcoastlines=False,
     showlakes=False,
     showrivers=False,
     bgcolor="rgba(0,0,0,0)"
 )
 
 fig.update_layout(
-    height=650,
+    height=600,
     margin={"r":0, "t":0, "l":0, "b":0},
     coloraxis_showscale=False
 )
@@ -82,21 +101,29 @@ event = st.plotly_chart(
     fig, 
     on_select="rerun", 
     selection_mode="points", 
-    use_container_width=True
+    use_container_width=True,
+    key="globe_view"
 )
 
-# 6. Process Clicks
+# 6. Handle Selection Updates from Map Interaction
 if event and "selection" in event and "points" in event["selection"]:
     points = event["selection"]["points"]
     if points:
-        clicked_country = points[0].get("location")
-        
-        if clicked_country:
-            if clicked_country == st.session_state.target_country:
-                st.session_state.score += 1
-                st.session_state.message = f"✅ **Correct!** That was {clicked_country}."
-                next_country()
-                st.rerun()
-            else:
-                st.session_state.message = f"❌ **Incorrect.** You clicked on {clicked_country}. Try again!"
-                st.rerun()
+        clicked = points[0].get("location")
+        if clicked and clicked != st.session_state.selected_country:
+            st.session_state.selected_country = clicked
+            st.rerun()
+
+# 7. Process Submission Logic
+if submit_clicked:
+    if st.session_state.selected_country:
+        if st.session_state.selected_country == st.session_state.target_country:
+            st.session_state.score += 1
+            st.session_state.message = f"✅ **Correct!** That was {st.session_state.selected_country}."
+            next_country()
+            st.rerun()
+        else:
+            st.session_state.message = f"❌ **Incorrect.** You selected {st.session_state.selected_country}. Try again!"
+            st.rerun()
+    else:
+        st.warning("Please click a country on the globe first before submitting!")
