@@ -39,17 +39,19 @@ def next_country():
     st.session_state.message = ""
     st.session_state.selected_country = None
 
-# 3. UI Header
+# 3. UI Header & Game Mode Dropdown
 st.title("🌍 3D Blue Marble Geography Quiz")
+
+# Dropdown for game modes
+game_mode = st.selectbox(
+    "Choose Border Mode:", 
+    ["Without borders", "With white borders"]
+)
+show_borders = (game_mode == "With white borders")
+
 st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
 st.markdown(f"**Score:** {st.session_state.score}")
 st.write(st.session_state.message)
-
-# Display current selection feedback
-if st.session_state.selected_country:
-    st.info(f"📍 Currently Selected: **{st.session_state.selected_country}**")
-else:
-    st.info("📍 Click a country on the globe to select it, then click Submit.")
 
 # Action Buttons
 col1, col2 = st.columns(2)
@@ -73,18 +75,20 @@ fig = px.choropleth(
     hover_data={"val": False, "name": False}
 )
 
-# Disable hover tooltips completely so answers aren't revealed on mouseover
+# Disable hover tooltips completely
 fig.update_traces(hoverinfo="none", hovertemplate=None)
 
-# Style it to look like a clean blue marble globe with no borders or labels
+# Style globe with dynamic border settings
 fig.update_geos(
     projection_type="orthographic",
     showocean=True,
     oceancolor="rgb(10, 25, 45)",
     showland=True,
     landcolor="rgb(30, 50, 75)",
-    showcountries=False,
-    showcoastlines=False,
+    showcountries=show_borders,
+    countrycolor="white",
+    showcoastlines=show_borders,
+    coastlinecolor="white",
     showlakes=False,
     showrivers=False,
     bgcolor="rgba(0,0,0,0)"
@@ -105,14 +109,13 @@ event = st.plotly_chart(
     key="globe_view"
 )
 
-# 6. Handle Selection Updates from Map Interaction
+# 6. Handle Selection Updates from Map Interaction (Silently tracked)
 if event and "selection" in event and "points" in event["selection"]:
     points = event["selection"]["points"]
     if points:
         clicked = points[0].get("location")
         if clicked and clicked != st.session_state.selected_country:
             st.session_state.selected_country = clicked
-            st.rerun()
 
 # 7. Process Submission Logic
 if submit_clicked:
