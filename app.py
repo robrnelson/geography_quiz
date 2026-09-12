@@ -90,7 +90,7 @@ deck = pdk.Deck(
 
 # 6. Render and capture clicks
 # Note: Streamlit 1.35+ is required for the on_select parameter
-deck_event = st.pydeck_chart(deck, on_select="rerun", selection_mode="single_object", height=600)
+deck_event = st.pydeck_chart(deck, on_select="rerun", selection_mode="single-object", height=600)
 
 # 7. Process clicks
 # Extract the names of currently selected countries (should be 0 or 1)
