@@ -6,11 +6,20 @@ import os
 
 st.set_page_config(page_title="Blue Marble Quiz", layout="wide")
 
-# 1. Connect Python to the HTML/JS Frontend
+# Connect Python to the HTML/JS Frontend
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
-globe_component = components.declare_component("blue_marble", path=frontend_dir)
 
+# --- ADD THIS DEBUGGING BLOCK ---
+if not os.path.exists(frontend_dir):
+    st.error(f"🚨 Python cannot find the frontend folder! It is looking here: {frontend_dir}")
+    st.stop()
+elif not os.path.exists(os.path.join(frontend_dir, "index.html")):
+    st.error(f"🚨 Python found the folder, but `index.html` is missing inside: {frontend_dir}")
+    st.stop()
+# --------------------------------
+
+globe_component = components.declare_component("blue_marble", path=frontend_dir)
 # 2. Load Country List for Targets
 @st.cache_data
 def get_country_names():
