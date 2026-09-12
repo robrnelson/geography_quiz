@@ -51,8 +51,15 @@
   let highlightColor = "#f4d35e";
   let highlightId = null;
   let size = 600;
+  let zoom = 1;              // persists across re-renders and drag, like rotation
+  const MIN_ZOOM = 0.6;
+  const MAX_ZOOM = 3.5;
   let R = 280;
   let cx = 300, cy = 300;
+
+  function updateR() {
+    R = size * 0.47 * zoom;
+  }
 
   // rotation persists across re-renders (Streamlit re-sends args on every
   // app rerun, but this script keeps running in the same iframe, so we
@@ -161,6 +168,13 @@
   let dragMoved = 0;
   let lastX = 0, lastY = 0;
   let rafPending = false;
+  const activePointers = new Map(); // pointerId -> {x, y}, for pinch-zoom
+  let pinchStartDist = null;
+  let pinchStartZoom = 1;
+
+  function clampZoom(z) {
+    return Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
+  }
 
   function scheduleRedraw() {
     if (rafPending) return;
@@ -171,16 +185,46 @@
     });
   }
 
+  function pointerDistance() {
+    const pts = Array.from(activePointers.values());
+    if (pts.length < 2) return null;
+    const dx = pts[0].x - pts[1].x;
+    const dy = pts[0].y - pts[1].y;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
   svg.addEventListener("pointerdown", (e) => {
-    dragging = true;
-    dragMoved = 0;
-    lastX = e.clientX;
-    lastY = e.clientY;
-    svg.classList.add("dragging");
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     svg.setPointerCapture(e.pointerId);
+
+    if (activePointers.size === 2) {
+      // starting a pinch gesture — stop treating this as a rotate-drag
+      dragging = false;
+      pinchStartDist = pointerDistance();
+      pinchStartZoom = zoom;
+    } else if (activePointers.size === 1) {
+      dragging = true;
+      dragMoved = 0;
+      lastX = e.clientX;
+      lastY = e.clientY;
+      svg.classList.add("dragging");
+    }
   });
 
   svg.addEventListener("pointermove", (e) => {
+    if (!activePointers.has(e.pointerId)) return;
+    activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+
+    if (activePointers.size === 2) {
+      const dist = pointerDistance();
+      if (pinchStartDist && dist) {
+        zoom = clampZoom(pinchStartZoom * (dist / pinchStartDist));
+        updateR();
+        scheduleRedraw();
+      }
+      return;
+    }
+
     if (!dragging) return;
     const dx = e.clientX - lastX;
     const dy = e.clientY - lastY;
@@ -198,13 +242,21 @@
   });
 
   function endDrag(e) {
-    if (!dragging) return;
-    dragging = false;
-    svg.classList.remove("dragging");
+    const wasSinglePointerClick = dragging && activePointers.size === 1 && dragMoved < 5;
+    activePointers.delete(e.pointerId);
+    if (activePointers.size < 2) pinchStartDist = null;
 
-    // a "click" is a pointer-up with negligible movement
-    if (dragMoved < 5) {
-      const target = e.target;
+    if (activePointers.size === 0) {
+      dragging = false;
+      svg.classList.remove("dragging");
+    }
+
+    // a "click" is a pointer-up with negligible movement, and no pinch
+    // in progress. Pointer capture redirects event.target to the
+    // capturing element, so we hit-test with elementFromPoint instead,
+    // which reports whatever is actually visible under the cursor.
+    if (wasSinglePointerClick) {
+      const target = document.elementFromPoint(e.clientX, e.clientY);
       const id = target && target.getAttribute ? target.getAttribute("data-id") : null;
       sendValue({ id: id ? id : null, nonce: Date.now() + Math.random() });
     }
@@ -212,6 +264,18 @@
 
   svg.addEventListener("pointerup", endDrag);
   svg.addEventListener("pointercancel", endDrag);
+
+  svg.addEventListener(
+    "wheel",
+    (e) => {
+      e.preventDefault();
+      const factor = e.deltaY < 0 ? 1.1 : 0.9;
+      zoom = clampZoom(zoom * factor);
+      updateR();
+      scheduleRedraw();
+    },
+    { passive: false }
+  );
 
   // ---- Streamlit render protocol ----
   window.addEventListener("message", (event) => {
@@ -224,7 +288,7 @@
     highlightColor = args.highlight_color || highlightColor;
     highlightId = args.highlight_id || null;
     size = args.height || 600;
-    R = size * 0.47;
+    updateR(); // recompute from current size, but keep the user's zoom level
     cx = size / 2;
     cy = size / 2;
 
