@@ -1,39 +1,42 @@
 import streamlit as st
-import folium
-from streamlit_folium import st_folium
-import geopandas as gpd
-from shapely.geometry import Point
+import pydeck as pdk
+import requests
 import random
 
 # Page config
-st.set_page_config(page_title="Globe Quiz", layout="wide")
+st.set_page_config(page_title="3D Globe Quiz", layout="wide")
 
-# 1. Load Country Data (Cached for performance)
+# 1. Load Country Data (No Geopandas needed!)
 @st.cache_data
 def load_data():
-    # Load world countries geojson
+    # Grab the world geojson directly
     url = "https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json"
-    world = gpd.read_file(url)
-    # Filter out Antarctica for the quiz (optional)
-    world = world[world.name != "Antarctica"]
-    return world
+    response = requests.get(url)
+    data = response.json()
+    
+    # Filter out Antarctica
+    data["features"] = [f for f in data["features"] if f["properties"]["name"] != "Antarctica"]
+    return data
 
-world = load_data()
+geojson_data = load_data()
+country_names = [f["properties"]["name"] for f in geojson_data["features"]]
 
 # 2. Initialize Session State
 if "score" not in st.session_state:
     st.session_state.score = 0
 if "target_country" not in st.session_state:
-    st.session_state.target_country = random.choice(world.name.tolist())
+    st.session_state.target_country = random.choice(country_names)
 if "message" not in st.session_state:
     st.session_state.message = ""
+if "last_selection_names" not in st.session_state:
+    st.session_state.last_selection_names = []
 
 def next_country():
-    st.session_state.target_country = random.choice(world.name.tolist())
+    st.session_state.target_country = random.choice(country_names)
     st.session_state.message = ""
 
 # 3. UI Header
-st.title("🌍 Blue Marble Geography Quiz")
+st.title("🌍 3D Blue Marble Geography Quiz")
 st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
 st.markdown(f"**Score:** {st.session_state.score}")
 st.write(st.session_state.message)
@@ -42,51 +45,72 @@ if st.button("Skip / Next Country"):
     next_country()
     st.rerun()
 
-# 4. Setup the Map (Label-free satellite imagery)
-# Using Esri World Imagery for the "blue marble" aesthetic without borders or labels
-tiles = "https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
-attr = "Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community"
-
-m = folium.Map(
-    location=[20, 0], 
-    zoom_start=2, 
-    tiles=tiles, 
-    attr=attr,
-    min_zoom=2,
-    max_bounds=True
+# 4. Setup PyDeck Layers
+# Esri Satellite Tiles for the label-free "blue marble" look
+tile_layer = pdk.Layer(
+    "TileLayer",
+    data="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",
+    min_zoom=0,
+    max_zoom=19,
+    pickable=False
 )
 
-# 5. Render Map and Capture Clicks
-# returned_objects=["last_clicked"] ensures it only reruns when the map is actually clicked
-map_data = st_folium(m, height=600, width=1000, returned_objects=["last_clicked"])
+# Invisible GeoJSON layer on top to capture clicks and highlight countries
+geojson_layer = pdk.Layer(
+    "GeoJsonLayer",
+    id="countries",
+    data=geojson_data,
+    opacity=1,
+    stroked=False,
+    filled=True,
+    extruded=False,
+    # Alpha channel is 1/255: mathematically it is there, visually it is invisible
+    get_fill_color=[0, 0, 0, 1],  
+    pickable=True,
+    auto_highlight=True,
+    # Flashes a transparent white over the country when hovered
+    highlight_color=[255, 255, 255, 60] 
+)
 
-# 6. Process Clicks
-if map_data and map_data.get("last_clicked"):
-    lat = map_data["last_clicked"]["lat"]
-    lng = map_data["last_clicked"]["lng"]
+# 5. Create the 3D Globe View
+view = pdk.View(type="_GlobeView", controller=True)
+
+deck = pdk.Deck(
+    views=[view],
+    initial_view_state=pdk.ViewState(
+        longitude=0,
+        latitude=0,
+        zoom=1,
+        min_zoom=0,
+        max_zoom=10
+    ),
+    layers=[tile_layer, geojson_layer],
+    map_provider=None, # Disable mapbox to ensure pure Esri tiles
+)
+
+# 6. Render and capture clicks
+# Note: Streamlit 1.35+ is required for the on_select parameter
+deck_event = st.pydeck_chart(deck, on_select="rerun", selection_mode="single_object", height=600)
+
+# 7. Process clicks
+# Extract the names of currently selected countries (should be 0 or 1)
+current_selection_names = []
+if deck_event and deck_event.selection.objects.get("countries"):
+    current_selection_names = [f["properties"]["name"] for f in deck_event.selection.objects["countries"]]
+
+# Compare with last selection to avoid the "ghost click" rerun bug
+if current_selection_names != st.session_state.last_selection_names:
+    st.session_state.last_selection_names = current_selection_names
     
-    # Create a Shapely Point from the click coordinates (Longitude first!)
-    click_point = Point(lng, lat)
-    
-    # Check if the point intersects with the target country's geometry
-    target_geom = world[world.name == st.session_state.target_country].geometry.values[0]
-    
-    if target_geom.contains(click_point):
-        st.session_state.score += 1
-        st.session_state.message = f"✅ **Correct!** That was {st.session_state.target_country}."
-        next_country()
-        st.rerun()
-    else:
-        # Optional: Figure out what country they actually clicked on
-        clicked_country = None
-        for idx, row in world.iterrows():
-            if row.geometry.contains(click_point):
-                clicked_country = row['name']
-                break
-                
-        if clicked_country:
-            st.session_state.message = f"❌ **Incorrect.** You clicked on {clicked_country}. Try again!"
-        else:
-            st.session_state.message = "❌ **Incorrect.** You clicked in the ocean. Try again!"
+    # If they actually clicked a country (and didn't just deselect)
+    if current_selection_names:
+        clicked_country = current_selection_names[0]
         
-        st.rerun()
+        if clicked_country == st.session_state.target_country:
+            st.session_state.score += 1
+            st.session_state.message = f"✅ **Correct!** That was {clicked_country}."
+            next_country()
+            st.rerun()
+        else:
+            st.session_state.message = f"❌ **Incorrect.** You clicked on {clicked_country}. Try again!"
+            st.rerun()
