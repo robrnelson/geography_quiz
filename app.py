@@ -1,6 +1,7 @@
 import streamlit as st
 import streamlit.components.v1 as components
-from geopy.distance import geodesic
+import requests
+import random
 import os
 
 st.set_page_config(page_title="Blue Marble Quiz", layout="wide")
@@ -10,33 +11,105 @@ parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
 globe_component = components.declare_component("blue_marble", path=frontend_dir)
 
-# 2. Set Up the Game State
-st.title("🌍 MapTap Clone: Blue Marble Edition")
+# 2. Load Country List for Targets
+@st.cache_data
+def get_country_names():
+    url = "https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json"
+    response = requests.get(url)
+    data = response.json()
+    return [f["properties"]["name"] for f in data["features"] if f["properties"]["name"] != "Antarctica"]
 
-# A simple target (You can expand this into a daily list later)
-target = {"name": "The Great Pyramid of Giza", "lat": 29.9792, "lon": 31.1342}
+country_names = get_country_names()
 
-st.markdown(f"### 🎯 Find: **{target['name']}**")
+# 3. Initialize Session State
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "target_country" not in st.session_state:
+    st.session_state.target_country = random.choice(country_names)
+if "message" not in st.session_state:
+    st.session_state.message = ""
+if "message_type" not in st.session_state:
+    st.session_state.message_type = "info"
+if "selected_country" not in st.session_state:
+    st.session_state.selected_country = None
+if "pin_lat" not in st.session_state:
+    st.session_state.pin_lat = None
+if "pin_lon" not in st.session_state:
+    st.session_state.pin_lon = None
 
-# 3. Render the Globe and Capture Clicks
-# This component returns the dictionary {lat, lon} sent from JavaScript
-click_data = globe_component(key="globe_view")
+def reset_selection():
+    st.session_state.target_country = random.choice(country_names)
+    st.session_state.selected_country = None
+    st.session_state.pin_lat = None
+    st.session_state.pin_lon = None
 
-# 4. Scoring Logic (MapTap Style)
+# 4. UI Layout
+st.title("🌍 3D Blue Marble Geography Quiz")
+
+game_mode = st.selectbox("Choose Border Mode:", ["Without borders", "With white borders"])
+show_borders = (game_mode == "With white borders")
+
+st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
+st.markdown(f"**Score:** {st.session_state.score}")
+
+if st.session_state.message:
+    if st.session_state.message_type == "success":
+        st.success(st.session_state.message)
+    elif st.session_state.message_type == "error":
+        st.error(st.session_state.message)
+else:
+    st.info("👆 Click a country on the globe, then click Submit.")
+
+# Action Buttons
+col1, col2 = st.columns(2)
+with col1:
+    submit_clicked = st.button("Submit Guess", type="primary", use_container_width=True)
+with col2:
+    if st.button("Skip / Next Country", use_container_width=True):
+        st.session_state.message = ""
+        st.session_state.message_type = "info"
+        reset_selection()
+        st.rerun()
+
+# 5. Render Globe and Capture Clicks
+# We pass our Python variables into the JS component here
+click_data = globe_component(
+    show_borders=show_borders, 
+    pin_lat=st.session_state.pin_lat, 
+    pin_lon=st.session_state.pin_lon,
+    key="globe_view"
+)
+
+# 6. Handle Selection Updates from the Map
 if click_data:
-    click_lat = click_data["lat"]
-    click_lon = click_data["lon"]
-    
-    # Calculate precise distance over the curve of the Earth
-    distance_km = geodesic((click_lat, click_lon), (target["lat"], target["lon"])).km
-    
-    # Simple scoring algorithm: Max 5000 points, lose 1 point per km off
-    score = max(0, int(5000 - distance_km))
-    
-    st.divider()
-    if distance_km < 100:
-        st.success(f"**Incredible!** You were only {distance_km:.0f} km away. Score: {score}/5000")
-    else:
-        st.warning(f"**Not quite.** You were {distance_km:.0f} km away. Score: {score}/5000")
+    # If the exact click location has changed, update our state
+    if click_data.get("lat") != st.session_state.pin_lat or click_data.get("lon") != st.session_state.pin_lon:
+        st.session_state.pin_lat = click_data["lat"]
+        st.session_state.pin_lon = click_data["lon"]
+        st.session_state.selected_country = click_data.get("country")
+        st.session_state.message = ""
+        st.session_state.message_type = "info"
         
-    st.info(f"📍 Your tap: {click_lat:.2f}, {click_lon:.2f} | Target: {target['lat']:.2f}, {target['lon']:.2f}")
+        # Warn them if they clicked the ocean
+        if not st.session_state.selected_country:
+            st.warning("You clicked the ocean! Please click a landmass.")
+            
+        st.rerun()
+
+# 7. Process Submission Logic
+if submit_clicked:
+    if st.session_state.selected_country:
+        if st.session_state.selected_country == st.session_state.target_country:
+            st.session_state.score += 1
+            st.session_state.message = f"🎯 **Correct!** That was indeed {st.session_state.selected_country}!"
+            st.session_state.message_type = "success"
+            reset_selection()
+            st.rerun()
+        else:
+            st.session_state.message = f"❌ **Incorrect.** You selected {st.session_state.selected_country}. Try again!"
+            st.session_state.message_type = "error"
+            st.rerun()
+    elif st.session_state.pin_lat:
+        st.warning("You clicked outside a recognized country. Please click inside a valid border!")
+    else:
+        st.warning("Please click a country on the globe first before submitting!")
