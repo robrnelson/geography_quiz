@@ -99,7 +99,8 @@ fig = px.choropleth(
     locations="name",
     featureidkey="properties.name",
     color="val",
-    color_continuous_scale=[[0, "rgb(30, 60, 100)"], [1, "rgb(35, 70, 110)"]],
+    # Blue-green satellite spectrum mapping for land
+    color_continuous_scale=[[0, "rgb(31, 65, 48)"], [1, "rgb(40, 78, 58)"]],
     hover_name=None,
     hover_data={"val": False, "name": False}
 )
@@ -127,13 +128,13 @@ if not show_borders and st.session_state.selected_country:
             hoverinfo="none"
         ))
 
-# Style globe with dynamic border settings
+# Style globe with true Blue Marble satellite aesthetic
 fig.update_geos(
     projection_type="orthographic",
     showocean=True,
-    oceancolor="rgb(10, 25, 45)",
+    oceancolor="rgb(11, 27, 61)",  # Deep sapphire blue marble ocean
     showland=True,
-    landcolor="rgb(30, 50, 75)",
+    landcolor="rgb(31, 65, 48)",    # Natural satellite earth green
     showcountries=show_borders,
     countrycolor="white",
     showcoastlines=show_borders,
@@ -147,7 +148,8 @@ fig.update_layout(
     height=600,
     margin={"r":0, "t":0, "l":0, "b":0},
     coloraxis_showscale=False,
-    showlegend=False
+    showlegend=False,
+    uirevision="active"  # Preserves user rotation/zoom state across reruns
 )
 
 # 5. Render Globe and Capture Clicks
