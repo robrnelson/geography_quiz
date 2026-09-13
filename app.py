@@ -2,7 +2,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 import requests
 import random
-
+import os
 st.set_page_config(page_title="Blue Marble Quiz", layout="wide")
 
 # Tell Streamlit to just look in the folder named "frontend" in the same directory
