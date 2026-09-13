@@ -81,14 +81,13 @@ with col2:
         st.rerun()
 
 # 5. Render Globe and Capture Clicks
-# We pass our Python variables into the JS component here
 click_data = globe_component(
     show_borders=show_borders, 
     pin_lat=st.session_state.pin_lat, 
     pin_lon=st.session_state.pin_lon,
-    key="globe_view"
+    key="globe_view",
+    default=None  # <-- ADD THIS LINE
 )
-
 # 6. Handle Selection Updates from the Map
 if click_data:
     # If the exact click location has changed, update our state
