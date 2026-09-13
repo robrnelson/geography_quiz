@@ -11,6 +11,10 @@ parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
 globe_component = components.declare_component("custom_globe", path=frontend_dir)
 
+# Session State
+if "last_click_id" not in st.session_state:
+    st.session_state.last_click_id = None
+
 @st.cache_data
 def get_country_names():
     url = "https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json"
@@ -82,13 +86,17 @@ click_data = globe_component(
 
 # Click Logic
 if click_data:
-    if click_data.get("lat") != st.session_state.pin_lat or click_data.get("lon") != st.session_state.pin_lon:
+    current_click_id = click_data.get("click_id")
+    
+    # Only process the click if the timestamp proves it is a genuinely NEW physical click
+    if current_click_id and current_click_id != st.session_state.last_click_id:
+        st.session_state.last_click_id = current_click_id
+        
         st.session_state.pin_lat = click_data.get("lat")
         st.session_state.pin_lon = click_data.get("lon")
         st.session_state.selected_country = click_data.get("country")
         
         if not st.session_state.selected_country:
-            # Stored in session state so it survives the rerun!
             st.session_state.message = "🌊 You clicked the ocean! Please click a landmass."
             st.session_state.message_type = "warning"
         else:
