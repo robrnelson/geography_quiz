@@ -4,7 +4,7 @@ import requests
 import random
 import os
 
-st.set_page_config(page_title="3D WebGL Quiz", layout="wide")
+st.set_page_config(page_title="Geography Quiz", layout="wide")
 
 # Connect Python to HTML
 parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -17,6 +17,7 @@ if "last_click_id" not in st.session_state:
 
 @st.cache_data
 def get_country_names():
+    # 110m Optimized Dataset
     url = "https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json"
     response = requests.get(url)
     data = response.json()
@@ -48,7 +49,7 @@ def reset_round():
     st.session_state.message = ""
 
 # UI Setup
-st.title("🌍 True 3D WebGL Geography Quiz")
+st.title("Geography Quiz")
 
 game_mode = st.selectbox("Choose Border Mode:", ["Without borders", "With white borders"])
 show_borders = (game_mode == "With white borders")
