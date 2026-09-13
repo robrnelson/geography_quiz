@@ -62,7 +62,7 @@
               .polygonSideColor(() => 'rgba(0,0,0,0)');
 
             // Fetch GeoJSON Data
-            fetch('[https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson](https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson)')
+            fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
               .then(res => res.json())
               .then(data => {
                  const countries = data.features.filter(f => f.properties.ADMIN !== "Antarctica");
