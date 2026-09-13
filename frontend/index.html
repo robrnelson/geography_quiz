@@ -74,12 +74,18 @@
                 sendValue({
                     country: polygon.properties.name,
                     lat: coords.lat,
-                    lon: coords.lng
+                    lon: coords.lng,
+                    click_id: Date.now() // <-- ADD THIS LINE
                 });
             });
 
             globe.onGlobeClick(({ lat, lng }) => {
-                sendValue({ country: null, lat: lat, lon: lng });
+                sendValue({ 
+                    country: null, 
+                    lat: lat, 
+                    lon: lng, 
+                    click_id: Date.now() // <-- ADD THIS LINE
+                });
             });
 
             isGlobeReady = true;
