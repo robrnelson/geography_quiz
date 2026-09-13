@@ -174,7 +174,7 @@
 
       // 3. Update Pin (Only display when borders are OFF)
       if (!args.show_borders && args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
-          globe.labelsData([{ lat: args.pin_lat, lng: args.pin_lon, text: '📍' }])
+          globe.labelsData([{ lat: args.pin_lat, lng: args.pin_lon, text: 'X' }])
                .labelLat(d => d.lat)
                .labelLng(d => d.lng)
                .labelText(d => d.text)
