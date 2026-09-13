@@ -75,6 +75,7 @@ click_data = globe_component(
     show_borders=show_borders, 
     pin_lat=st.session_state.pin_lat, 
     pin_lon=st.session_state.pin_lon,
+    selected_country=st.session_state.selected_country, # <-- ADD THIS LINE
     key="globe_view",
     default=None
 )
