@@ -17,10 +17,10 @@ if "last_click_id" not in st.session_state:
 
 @st.cache_data
 def get_country_names():
-    url = "https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson"
+    url = "https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json"
     response = requests.get(url)
     data = response.json()
-    return [f["properties"]["ADMIN"] for f in data["features"] if f["properties"]["ADMIN"] != "Antarctica"]
+    return [f["properties"]["name"] for f in data["features"] if f["properties"]["name"] != "Antarctica"]
 
 country_names = get_country_names()
 
