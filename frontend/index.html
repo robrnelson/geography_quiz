@@ -3,7 +3,6 @@
 <head>
   <meta charset="UTF-8">
   <script src="https://unpkg.com/globe.gl"></script>
-  <!-- This library is required for the handshake! -->
   <script src="https://unpkg.com/streamlit-component-lib@1.3.0/dist/streamlit.js"></script>
   <style>
     body { margin: 0; padding: 0; overflow: hidden; background-color: transparent; }
@@ -14,12 +13,13 @@
   <div id="globeViz"></div>
   <script>
     try {
-        // 1. Initialize the Globe
+        // 1. Initialize the Globe with Solid Colors (No Blue Marble)
         const globe = Globe()(document.getElementById('globeViz'))
-          .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+          .showGlobe(true)
+          .globeColor('rgb(15, 35, 65)') // Ocean Blue
           .backgroundColor('rgba(0,0,0,0)')
-          .polygonAltitude(0.005)
-          .polygonCapColor(() => 'rgba(0,0,0,0)')
+          .polygonAltitude(0.01)
+          .polygonCapColor(() => 'rgb(28, 62, 42)') // Land Green
           .polygonSideColor(() => 'rgba(0,0,0,0)');
 
         // 2. Fetch GeoJSON Data
@@ -61,8 +61,7 @@
                    .labelText(d => d.text)
                    .labelSize(5)
                    .labelColor(() => 'white')
-                   .labelDotRadius(0.5)
-                   .labelResolution(4);
+                   .labelDotRadius(0.5);
           } else {
               globe.labelsData([]);
           }
@@ -71,7 +70,7 @@
 
         // 5. THE HANDSHAKE
         Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
-        Streamlit.setComponentReady(); // Tells Python to stop loading!
+        Streamlit.setComponentReady();
 
     } catch (error) {
         console.error("Globe Error:", error);
