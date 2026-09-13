@@ -5,7 +5,18 @@
   <script src="https://unpkg.com/globe.gl"></script>
   <style>
     body { margin: 0; padding: 0; overflow: hidden; background-color: transparent; }
-    #globeViz { width: 100vw; height: 600px; display: block; }  </style>
+    #globeViz { width: 100vw; height: 100vh; position: relative; }
+    /* Force the canvas three.js creates to actually fill its container,
+       in case it was sized from a stale/zero measurement at creation time */
+    #globeViz canvas {
+      display: block !important;
+      width: 100% !important;
+      height: 100% !important;
+      position: absolute !important;
+      top: 0 !important;
+      left: 0 !important;
+    }
+  </style>
 </head>
 <body>
   <div id="globeViz"></div>
@@ -57,13 +68,11 @@
 
         try {
             globe = Globe()(document.getElementById('globeViz'))
-              .width(window.innerWidth) // Force width to match the iframe
-              .height(600)              // FORCE WebGL to 600px to bypass the 0px bug!
               .showGlobe(true)
-              .globeImageUrl(solidColorTexture('rgb(15, 35, 65)')) 
+              .globeImageUrl(solidColorTexture('rgb(15, 35, 65)')) // Ocean Blue
               .backgroundColor('rgba(0,0,0,0)')
               .polygonAltitude(0.01)
-              .polygonCapColor(() => 'rgb(28, 62, 42)') 
+              .polygonCapColor(() => 'rgb(28, 62, 42)') // Land Green
               .polygonSideColor(() => 'rgba(0,0,0,0)');
 
             // Fetch GeoJSON Data
@@ -88,6 +97,25 @@
             });
 
             isGlobeReady = true;
+
+            // Defensive fix: three.js/globe.gl sizes its renderer from the
+            // container's dimensions at the exact moment Globe() is called.
+            // If the iframe hadn't finished being sized by Streamlit yet at
+            // that instant, the canvas can end up locked at a stale/zero
+            // resolution even though the container looks fine afterward.
+            // Re-assert the real size now, shortly after, and on resize.
+            function resyncGlobeSize() {
+                const el = document.getElementById('globeViz');
+                const w = el.clientWidth || window.innerWidth;
+                const h = el.clientHeight || window.innerHeight;
+                if (w > 0 && h > 0) {
+                    globe.width(w).height(h);
+                }
+            }
+            resyncGlobeSize();
+            setTimeout(resyncGlobeSize, 300);
+            setTimeout(resyncGlobeSize, 1000);
+            window.addEventListener('resize', resyncGlobeSize);
 
         } catch (error) {
             console.error("Failed to build 3D globe:", error);
