@@ -10,35 +10,6 @@ parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
 html_path = os.path.join(frontend_dir, "index.html")
 
-# --- CLOUD DEBUGGER ---
-st.warning("🔍 Cloud File Debugger Active")
-st.write(f"Looking for file at: `{html_path}`")
-
-if os.path.exists(html_path):
-    st.success("File found! Here is exactly what Streamlit Cloud sees inside it:")
-    with open(html_path, "r", encoding="utf-8") as f:
-        html_content = f.read()
-        if not html_content.strip():
-            st.error("CRITICAL ERROR: The file is completely empty!")
-        else:
-            st.code(html_content, language="html")
-else:
-    st.error("CRITICAL ERROR: Streamlit Cloud cannot find the `index.html` file at all! It is not on the server.")
-st.divider()
-# ----------------------
-
-globe_component = components.declare_component("blue_marble", path=frontend_dir)
-
-# ... (the rest of your app.py code) ...
-# --- ADD THIS DEBUGGING BLOCK ---
-if not os.path.exists(frontend_dir):
-    st.error(f"🚨 Python cannot find the frontend folder! It is looking here: {frontend_dir}")
-    st.stop()
-elif not os.path.exists(os.path.join(frontend_dir, "index.html")):
-    st.error(f"🚨 Python found the folder, but `index.html` is missing inside: {frontend_dir}")
-    st.stop()
-# --------------------------------
-
 globe_component = components.declare_component("blue_marble", path=frontend_dir)
 # 2. Load Country List for Targets
 @st.cache_data
