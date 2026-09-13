@@ -61,22 +61,21 @@
               .polygonCapColor(() => 'rgba(0,0,0,0)') // Completely transparent default land
               .polygonSideColor(() => 'rgba(0,0,0,0)');
 
-            // Fetch GeoJSON Data
-            //fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
+            // Fetch 110m Optimized GeoJSON Data
             fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
               .then(res => res.json())
               .then(data => {
-                 const countries = data.features.filter(f => f.proerties.name !== "Antarctica");
+                 const countries = data.features.filter(f => f.properties.name !== "Antarctica");
                  globe.polygonsData(countries);
               });
 
-            // Handle Clicks
+            // Handle Clicks with click_id
             globe.onPolygonClick((polygon, event, coords) => {
                 sendValue({
-                    country: polygon.proerties.name,
+                    country: polygon.properties.name,
                     lat: coords.lat,
                     lon: coords.lng,
-                    click_id: Date.now() // <-- ADD THIS LINE
+                    click_id: Date.now() 
                 });
             });
 
@@ -84,8 +83,8 @@
                 sendValue({ 
                     country: null, 
                     lat: lat, 
-                    lon: lng, 
-                    click_id: Date.now() // <-- ADD THIS LINE
+                    lon: lng,
+                    click_id: Date.now() 
                 });
             });
 
