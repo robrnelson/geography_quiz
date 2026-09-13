@@ -4,7 +4,7 @@ import requests
 import random
 import os
 
-st.set_page_config(page_title="Custom Globe Quiz", layout="wide")
+st.set_page_config(page_title="3D WebGL Quiz", layout="wide")
 
 # Connect Python to HTML
 parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -44,7 +44,7 @@ def reset_round():
     st.session_state.message = ""
 
 # UI Setup
-st.title("🌍 Custom HTML Globe Quiz")
+st.title("🌍 True 3D WebGL Geography Quiz")
 
 game_mode = st.selectbox("Choose Border Mode:", ["Without borders", "With white borders"])
 show_borders = (game_mode == "With white borders")
@@ -80,8 +80,8 @@ click_data = globe_component(
 # Click Logic
 if click_data:
     if click_data.get("lat") != st.session_state.pin_lat or click_data.get("lon") != st.session_state.pin_lon:
-        st.session_state.pin_lat = click_data["lat"]
-        st.session_state.pin_lon = click_data["lon"]
+        st.session_state.pin_lat = click_data.get("lat")
+        st.session_state.pin_lon = click_data.get("lon")
         st.session_state.selected_country = click_data.get("country")
         st.session_state.message = ""
         
