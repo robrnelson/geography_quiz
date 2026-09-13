@@ -156,15 +156,24 @@
       const args = event.data.args || {};
       if (!isGlobeReady) return; // Safety check
 
-      // Update Borders
+      // 1. Update Borders
       if (args.show_borders) {
           globe.polygonStrokeColor(() => 'white');
       } else {
           globe.polygonStrokeColor(() => 'rgba(0,0,0,0)'); 
       }
 
-      // Update Pin
-      if (args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
+      // 2. Highlight the Selected Country
+      globe.polygonCapColor(d => {
+          // If we are in border mode and this specific country is selected, highlight it!
+          if (args.show_borders && args.selected_country && d.properties.name === args.selected_country) {
+              return 'rgb(80, 160, 100)'; // Bright Highlight Green
+          }
+          return 'rgb(28, 62, 42)'; // Default Land Green
+      });
+
+      // 3. Update Pin (Only display when borders are OFF)
+      if (!args.show_borders && args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
           globe.labelsData([{ lat: args.pin_lat, lng: args.pin_lon, text: '📍' }])
                .labelLat(d => d.lat)
                .labelLng(d => d.lng)
@@ -173,6 +182,7 @@
                .labelColor(() => 'white')
                .labelDotRadius(0.5);
       } else {
+          // Clear pins in border mode
           globe.labelsData([]);
       }
     });
