@@ -2,10 +2,11 @@ import streamlit as st
 import streamlit.components.v1 as components
 import requests
 import random
-import os
 
 st.set_page_config(page_title="Blue Marble Quiz", layout="wide")
 
+# Tell Streamlit to just look in the folder named "frontend" in the same directory
+globe_component = components.declare_component("blue_marble", path="frontend")
 # Connect Python to the HTML/JS Frontend
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
