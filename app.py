@@ -57,6 +57,8 @@ if st.session_state.message:
         st.success(st.session_state.message)
     elif st.session_state.message_type == "error":
         st.error(st.session_state.message)
+    elif st.session_state.message_type == "warning":
+        st.warning(st.session_state.message)
 else:
     st.info("👆 Click a country on the globe, then click Submit.")
 
@@ -83,10 +85,14 @@ if click_data:
         st.session_state.pin_lat = click_data.get("lat")
         st.session_state.pin_lon = click_data.get("lon")
         st.session_state.selected_country = click_data.get("country")
-        st.session_state.message = ""
         
         if not st.session_state.selected_country:
-            st.warning("You clicked the ocean! Please click a landmass.")
+            # Stored in session state so it survives the rerun!
+            st.session_state.message = "🌊 You clicked the ocean! Please click a landmass."
+            st.session_state.message_type = "warning"
+        else:
+            st.session_state.message = ""
+            st.session_state.message_type = "info"
             
         st.rerun()
 
