@@ -9,7 +9,7 @@ st.set_page_config(page_title="Custom Globe Quiz", layout="wide")
 # Connect Python to HTML
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
-globe_component = components.declare_component("blue_marble", path=frontend_dir)
+globe_component = components.declare_component("custom_globe", path=frontend_dir)
 
 @st.cache_data
 def get_country_names():
