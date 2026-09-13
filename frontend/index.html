@@ -63,17 +63,17 @@
 
             // Fetch GeoJSON Data
             //fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
-            fetch('https://raw.githubusercontent.com/datasets/geo-countries/master/data/countries.geojson')
+            fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
               .then(res => res.json())
               .then(data => {
-                 const countries = data.features.filter(f => f.properties.ADMIN !== "Antarctica");
+                 const countries = data.features.filter(f => f.proerties.name !== "Antarctica");
                  globe.polygonsData(countries);
               });
 
             // Handle Clicks
             globe.onPolygonClick((polygon, event, coords) => {
                 sendValue({
-                    country: polygon.properties.ADMIN,
+                    country: polygon.proerties.name,
                     lat: coords.lat,
                     lon: coords.lng,
                     click_id: Date.now() // <-- ADD THIS LINE
@@ -159,7 +159,7 @@
       // 2. Highlight the Selected Country
       globe.polygonCapColor(d => {
           // If we are in border mode and this specific country is selected, highlight it!
-          if (args.show_borders && args.selected_country && d.properties.ADMIN === args.selected_country) {
+          if (args.show_borders && args.selected_country && d.proerties.name === args.selected_country) {
                  return 'rgba(255, 255, 255, 0.4)';          }
           return 'rgba(0,0,0,0)'; // Default Land Green
       });
