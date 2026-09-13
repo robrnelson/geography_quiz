@@ -45,20 +45,6 @@
     let globe;
     let isGlobeReady = false;
 
-    // globe.gl has no globeColor() accessor - the real API only takes a
-    // texture URL via globeImageUrl(). Build a 1x1 solid-color canvas and
-    // hand it in as a data URL to get a flat ocean color with no image
-    // asset needed.
-    function solidColorTexture(cssColor) {
-        const canvas = document.createElement('canvas');
-        canvas.width = 2;
-        canvas.height = 1;
-        const ctx = canvas.getContext('2d');
-        ctx.fillStyle = cssColor;
-        ctx.fillRect(0, 0, 2, 1);
-        return canvas.toDataURL();
-    }
-
     function initGlobe() {
         // Wait safely if the globe.gl library is still downloading over the network
         if (typeof Globe === 'undefined') {
@@ -69,10 +55,10 @@
         try {
             globe = Globe()(document.getElementById('globeViz'))
               .showGlobe(true)
-              .globeImageUrl(solidColorTexture('rgb(15, 35, 65)')) // Ocean Blue
+              .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg') // The NASA Texture!
               .backgroundColor('rgba(0,0,0,0)')
               .polygonAltitude(0.01)
-              .polygonCapColor(() => 'rgb(28, 62, 42)') // Land Green
+              .polygonCapColor(() => 'rgba(0,0,0,0)') // Completely transparent default land
               .polygonSideColor(() => 'rgba(0,0,0,0)');
 
             // Fetch GeoJSON Data
@@ -167,9 +153,8 @@
       globe.polygonCapColor(d => {
           // If we are in border mode and this specific country is selected, highlight it!
           if (args.show_borders && args.selected_country && d.properties.name === args.selected_country) {
-              return 'rgb(80, 160, 100)'; // Bright Highlight Green
-          }
-          return 'rgb(28, 62, 42)'; // Default Land Green
+                 return 'rgba(255, 255, 255, 0.4)';          }
+          return 'rgba(0,0,0,0)'; // Default Land Green
       });
 
       // 3. Update Pin (Only display when borders are OFF)
