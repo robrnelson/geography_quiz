@@ -4,14 +4,13 @@ import requests
 import random
 import os
 
-st.set_page_config(page_title="Blue Marble Quiz", layout="wide")
+st.set_page_config(page_title="Custom Globe Quiz", layout="wide")
 
+# Connect Python to HTML
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
-html_path = os.path.join(frontend_dir, "index.html")
-
 globe_component = components.declare_component("blue_marble", path=frontend_dir)
-# 2. Load Country List for Targets
+
 @st.cache_data
 def get_country_names():
     url = "https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json"
@@ -21,7 +20,7 @@ def get_country_names():
 
 country_names = get_country_names()
 
-# 3. Initialize Session State
+# Session State
 if "score" not in st.session_state:
     st.session_state.score = 0
 if "target_country" not in st.session_state:
@@ -37,14 +36,15 @@ if "pin_lat" not in st.session_state:
 if "pin_lon" not in st.session_state:
     st.session_state.pin_lon = None
 
-def reset_selection():
+def reset_round():
     st.session_state.target_country = random.choice(country_names)
     st.session_state.selected_country = None
     st.session_state.pin_lat = None
     st.session_state.pin_lon = None
+    st.session_state.message = ""
 
-# 4. UI Layout
-st.title("🌍 3D Blue Marble Geography Quiz")
+# UI Setup
+st.title("🌍 Custom HTML Globe Quiz")
 
 game_mode = st.selectbox("Choose Border Mode:", ["Without borders", "With white borders"])
 show_borders = (game_mode == "With white borders")
@@ -60,49 +60,47 @@ if st.session_state.message:
 else:
     st.info("👆 Click a country on the globe, then click Submit.")
 
-# Action Buttons
 col1, col2 = st.columns(2)
 with col1:
     submit_clicked = st.button("Submit Guess", type="primary", use_container_width=True)
 with col2:
     if st.button("Skip / Next Country", use_container_width=True):
-        st.session_state.message = ""
-        st.session_state.message_type = "info"
-        reset_selection()
+        reset_round()
         st.rerun()
 
-# 5. Render Globe and Capture Clicks
+# Render Globe
 click_data = globe_component(
     show_borders=show_borders, 
     pin_lat=st.session_state.pin_lat, 
     pin_lon=st.session_state.pin_lon,
     key="globe_view",
-    default=None  # <-- ADD THIS LINE
+    default=None
 )
-# 6. Handle Selection Updates from the Map
+
+# Click Logic
 if click_data:
-    # If the exact click location has changed, update our state
     if click_data.get("lat") != st.session_state.pin_lat or click_data.get("lon") != st.session_state.pin_lon:
         st.session_state.pin_lat = click_data["lat"]
         st.session_state.pin_lon = click_data["lon"]
         st.session_state.selected_country = click_data.get("country")
         st.session_state.message = ""
-        st.session_state.message_type = "info"
         
-        # Warn them if they clicked the ocean
         if not st.session_state.selected_country:
             st.warning("You clicked the ocean! Please click a landmass.")
             
         st.rerun()
 
-# 7. Process Submission Logic
+# Submission Logic
 if submit_clicked:
     if st.session_state.selected_country:
         if st.session_state.selected_country == st.session_state.target_country:
             st.session_state.score += 1
             st.session_state.message = f"🎯 **Correct!** That was indeed {st.session_state.selected_country}!"
             st.session_state.message_type = "success"
-            reset_selection()
+            st.session_state.target_country = random.choice(country_names)
+            st.session_state.selected_country = None
+            st.session_state.pin_lat = None
+            st.session_state.pin_lon = None
             st.rerun()
         else:
             st.session_state.message = f"❌ **Incorrect.** You selected {st.session_state.selected_country}. Try again!"
