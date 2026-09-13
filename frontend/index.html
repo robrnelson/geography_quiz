@@ -165,17 +165,23 @@
 
       // 3. Update Pin (Only display when borders are OFF)
       if (!args.show_borders && args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
-          globe.labelsData([{ lat: args.pin_lat, lng: args.pin_lon, text: 'X' }])
-               .labelLat(d => d.lat)
-               .labelLng(d => d.lng)
-               .labelText(d => d.text)
-               .labelSize(2.2)
-               .labelColor(() => 'white')
-               .labelDotRadius(0)
-               .labelResolution(4);
+          globe.htmlElementsData([{ lat: args.pin_lat, lng: args.pin_lon }])
+               .htmlLat(d => d.lat)
+               .htmlLng(d => d.lng)
+               .htmlElement(() => {
+                   const el = document.createElement('div');
+                   el.textContent = '×';
+                   el.style.color = 'white';
+                   el.style.fontSize = '18px';
+                   el.style.fontWeight = 'bold';
+                   el.style.lineHeight = '1';
+                   el.style.transform = 'translate(-50%, -50%)';
+                   el.style.pointerEvents = 'none'; // let clicks pass through to the globe
+                   el.style.textShadow = '0 0 3px rgba(0,0,0,0.9)'; // stay visible on light land too
+                   return el;
+               });
       } else {
-          // Clear pins in border mode
-          globe.labelsData([]);
+          globe.htmlElementsData([]);
       }
     });
   </script>
