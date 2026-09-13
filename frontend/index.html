@@ -89,6 +89,9 @@
                 });
             });
 
+            // Turn off the drifting/momentum effect
+            globe.controls().enableDamping = false;
+          
             isGlobeReady = true;
 
             // Defensive fix: three.js/globe.gl sizes its renderer from the
