@@ -163,9 +163,10 @@
                .labelLat(d => d.lat)
                .labelLng(d => d.lng)
                .labelText(d => d.text)
-               .labelSize(5)
+               .labelSize(2.2)
                .labelColor(() => 'white')
-               .labelDotRadius(0.5);
+               .labelDotRadius(0)
+               .labelResolution(4);
       } else {
           // Clear pins in border mode
           globe.labelsData([]);
