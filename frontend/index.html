@@ -1,12 +1,81 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
+  <meta charset="UTF-8">
+  <script src="https://unpkg.com/globe.gl"></script>
+  <!-- This library is required for the handshake! -->
+  <script src="https://unpkg.com/streamlit-component-lib@1.3.0/dist/streamlit.js"></script>
+  <style>
+    body { margin: 0; padding: 0; overflow: hidden; background-color: transparent; }
+    #globeViz { width: 100vw; height: 100vh; }
+  </style>
 </head>
-<body style="background-color: lightblue; text-align: center; font-family: sans-serif;">
-    <h2>If you can read this, the component loaded!</h2>
-    <script>
-        console.log("HELLO FROM THE COMPONENT!");
-    </script>
+<body>
+  <div id="globeViz"></div>
+  <script>
+    try {
+        // 1. Initialize the Globe
+        const globe = Globe()(document.getElementById('globeViz'))
+          .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+          .backgroundColor('rgba(0,0,0,0)')
+          .polygonAltitude(0.005)
+          .polygonCapColor(() => 'rgba(0,0,0,0)')
+          .polygonSideColor(() => 'rgba(0,0,0,0)');
+
+        // 2. Fetch GeoJSON Data
+        fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
+          .then(res => res.json())
+          .then(data => {
+             const countries = data.features.filter(f => f.properties.name !== "Antarctica");
+             globe.polygonsData(countries);
+          });
+
+        // 3. Handle Clicks
+        globe.onPolygonClick((polygon, event, coords) => {
+            Streamlit.setComponentValue({
+                country: polygon.properties.name,
+                lat: coords.lat,
+                lon: coords.lng
+            });
+        });
+
+        globe.onGlobeClick(({ lat, lng }) => {
+            Streamlit.setComponentValue({ country: null, lat: lat, lon: lng });
+        });
+
+        // 4. Handle Python Updates
+        function onRender(event) {
+          if (!event.detail.args) return;
+          const args = event.detail.args;
+          
+          if (args.show_borders) {
+              globe.polygonStrokeColor(() => 'white');
+          } else {
+              globe.polygonStrokeColor(() => 'rgba(0,0,0,0)'); 
+          }
+
+          if (args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
+              globe.labelsData([{ lat: args.pin_lat, lng: args.pin_lon, text: '📍' }])
+                   .labelLat(d => d.lat)
+                   .labelLng(d => d.lng)
+                   .labelText(d => d.text)
+                   .labelSize(5)
+                   .labelColor(() => 'white')
+                   .labelDotRadius(0.5)
+                   .labelResolution(4);
+          } else {
+              globe.labelsData([]);
+          }
+          Streamlit.setFrameHeight(600);
+        }
+
+        // 5. THE HANDSHAKE
+        Streamlit.events.addEventListener(Streamlit.RENDER_EVENT, onRender);
+        Streamlit.setComponentReady(); // Tells Python to stop loading!
+
+    } catch (error) {
+        console.error("Globe Error:", error);
+    }
+  </script>
 </body>
 </html>
