@@ -10,6 +10,7 @@
 </head>
 <body>
   <div id="globeViz"></div>
+  <div id="globeError" style="display:none; color:#f66; font-family:sans-serif; padding:20px;"></div>
   <script>
     // ---- MINIMAL STREAMLIT COMPONENT PROTOCOL (From Claude) ----
     function sendToStreamlit(type, data) {
@@ -34,6 +35,20 @@
     let globe;
     let isGlobeReady = false;
 
+    // globe.gl has no globeColor() accessor - the real API only takes a
+    // texture URL via globeImageUrl(). Build a 1x1 solid-color canvas and
+    // hand it in as a data URL to get a flat ocean color with no image
+    // asset needed.
+    function solidColorTexture(cssColor) {
+        const canvas = document.createElement('canvas');
+        canvas.width = 2;
+        canvas.height = 1;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = cssColor;
+        ctx.fillRect(0, 0, 2, 1);
+        return canvas.toDataURL();
+    }
+
     function initGlobe() {
         // Wait safely if the globe.gl library is still downloading over the network
         if (typeof Globe === 'undefined') {
@@ -42,18 +57,13 @@
         }
 
         try {
-            statusEl.innerHTML = "2. Library downloaded. Building 3D Canvas...";
-            
-            // Replaced the hallucinated method with the valid Blue Marble image URL!
             globe = Globe()(document.getElementById('globeViz'))
               .showGlobe(true)
-              .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
+              .globeImageUrl(solidColorTexture('rgb(15, 35, 65)')) // Ocean Blue
               .backgroundColor('rgba(0,0,0,0)')
               .polygonAltitude(0.01)
-              .polygonCapColor(() => 'rgba(0,0,0,0)') // Transparent land so we see the image
+              .polygonCapColor(() => 'rgb(28, 62, 42)') // Land Green
               .polygonSideColor(() => 'rgba(0,0,0,0)');
-
-            statusEl.innerHTML = "3. Fetching Country Borders...";
 
             // Fetch GeoJSON Data
             fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
@@ -80,8 +90,32 @@
 
         } catch (error) {
             console.error("Failed to build 3D globe:", error);
+            showFrontendError("Failed to build the 3D globe: " + error.message);
         }
     }
+
+    function showFrontendError(msg) {
+        const el = document.getElementById('globeError');
+        el.textContent = "⚠️ " + msg + " (see browser console for details)";
+        el.style.display = 'block';
+    }
+
+    // If globe.gl never loads (CDN blocked, offline, etc.) give up after
+    // a while instead of retrying silently forever.
+    let waitedMs = 0;
+    const ORIGINAL_INIT = initGlobe;
+    initGlobe = function () {
+        if (typeof Globe === 'undefined') {
+            waitedMs += 50;
+            if (waitedMs > 8000) {
+                showFrontendError("The globe.gl library never finished loading from unpkg.com.");
+                return;
+            }
+            setTimeout(initGlobe, 50);
+            return;
+        }
+        ORIGINAL_INIT();
+    };
 
     // Start building the globe
     initGlobe();
