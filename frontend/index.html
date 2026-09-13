@@ -57,11 +57,13 @@
 
         try {
             globe = Globe()(document.getElementById('globeViz'))
+              .width(window.innerWidth) // Force width to match the iframe
+              .height(600)              // FORCE WebGL to 600px to bypass the 0px bug!
               .showGlobe(true)
-              .globeImageUrl(solidColorTexture('rgb(15, 35, 65)')) // Ocean Blue
+              .globeImageUrl(solidColorTexture('rgb(15, 35, 65)')) 
               .backgroundColor('rgba(0,0,0,0)')
               .polygonAltitude(0.01)
-              .polygonCapColor(() => 'rgb(28, 62, 42)') // Land Green
+              .polygonCapColor(() => 'rgb(28, 62, 42)') 
               .polygonSideColor(() => 'rgba(0,0,0,0)');
 
             // Fetch GeoJSON Data
