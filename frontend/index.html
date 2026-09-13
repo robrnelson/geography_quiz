@@ -42,13 +42,18 @@
         }
 
         try {
+            statusEl.innerHTML = "2. Library downloaded. Building 3D Canvas...";
+            
+            // Replaced the hallucinated method with the valid Blue Marble image URL!
             globe = Globe()(document.getElementById('globeViz'))
               .showGlobe(true)
-              .globeColor('rgb(15, 35, 65)') // Ocean Blue
+              .globeImageUrl('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg')
               .backgroundColor('rgba(0,0,0,0)')
               .polygonAltitude(0.01)
-              .polygonCapColor(() => 'rgb(28, 62, 42)') // Land Green
+              .polygonCapColor(() => 'rgba(0,0,0,0)') // Transparent land so we see the image
               .polygonSideColor(() => 'rgba(0,0,0,0)');
+
+            statusEl.innerHTML = "3. Fetching Country Borders...";
 
             // Fetch GeoJSON Data
             fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
