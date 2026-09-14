@@ -62,8 +62,9 @@
                                                  // so large countries (Russia, Canada, etc.) don't
                                                  // sink below the surface at near-zero altitude
               .polygonCapColor(() => 'rgba(0,0,0,0)') // Completely transparent default land
-              .polygonSideColor(() => 'rgba(0,0,0,0)');
-
+              .polygonSideColor(() => 'rgba(0,0,0,0)')
+              .polygonStrokeColor(() => 'rgba(0,0,0,0)');
+          
             // Fetch 110m Optimized GeoJSON Data
             //fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
             fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson')
@@ -155,11 +156,11 @@
       const args = event.data.args || {};
       if (!isGlobeReady) return; // Safety check
 
-      // 1. Update Borders
+      // 1. Swap the Background Texture!
       if (args.show_borders) {
-          globe.polygonStrokeColor(() => 'white');
+          globe.globeImageUrl('./earth-highres-bordered.jpg');
       } else {
-          globe.polygonStrokeColor(() => 'rgba(0,0,0,0)'); 
+          globe.globeImageUrl('./earth-highres.jpg'); 
       }
 
       // 2. Highlight the Selected Country
