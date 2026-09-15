@@ -41,6 +41,8 @@
     componentReady();
     setFrameHeight(600);
 
+    const getCountryName = (d) => d.properties.ADMIN || d.properties.name;
+    
     // ---- TRUE 3D WEBGL GLOBE LOGIC ----
     let globe;
     let isGlobeReady = false;
@@ -165,10 +167,16 @@
 
       // 2. Highlight the Selected Country
       globe.polygonCapColor(d => {
-          // If we are in border mode and this specific country is selected, highlight it!
-          if (args.show_borders && args.selected_country && d.properties.ADMIN === args.selected_country) {
-                 return 'rgba(0, 255, 255, 0.5)';          }
-          return 'rgba(0,0,0,0)'; // Default Land Green
+          const name = getCountryName(d);
+          if (args.show_borders) {
+              if (args.selected_country && name === args.selected_country) {
+                  return 'rgba(255, 215, 0, 0.6)'; // Gold for active guess
+              }
+              if (args.last_correct_country && name === args.last_correct_country) {
+                  return 'rgba(50, 255, 50, 0.6)'; // Green for previous correct answer!
+              }
+          }
+          return 'rgba(0,0,0,0)';
       });
 
       // 3. Update Pin (Only display when borders are OFF)
