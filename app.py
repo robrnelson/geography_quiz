@@ -89,6 +89,7 @@ click_data = globe_component(
     pin_lat=st.session_state.pin_lat, 
     pin_lon=st.session_state.pin_lon,
     selected_country=st.session_state.selected_country, # <-- ADD THIS LINE
+    last_correct_country=st.session_state.last_correct_country, # <-- Add this line!
     key="globe_view",
     default=None
 )
