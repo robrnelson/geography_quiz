@@ -15,6 +15,9 @@ globe_component = components.declare_component("custom_globe", path=frontend_dir
 if "last_click_id" not in st.session_state:
     st.session_state.last_click_id = None
 
+if "last_correct_country" not in st.session_state:
+    st.session_state.last_correct_country = None
+
 @st.cache_data
 def get_country_names():
     # Natural Earth 1:50m admin-0 countries: much higher-detail borders
@@ -101,6 +104,8 @@ if click_data:
         st.session_state.pin_lat = click_data.get("lat")
         st.session_state.pin_lon = click_data.get("lon")
         st.session_state.selected_country = click_data.get("country")
+
+        st.session_state.last_correct_country = None
         
         if not st.session_state.selected_country:
             st.session_state.message = "🌊 You clicked the ocean! Please click a landmass."
@@ -118,6 +123,7 @@ if submit_clicked:
             st.session_state.score += 1
             st.session_state.message = f"🎯 **Correct!** That was indeed {st.session_state.selected_country}!"
             st.session_state.message_type = "success"
+            st.session_state.last_correct_country = st.session_state.selected_country
             st.session_state.target_country = random.choice(country_names)
             st.session_state.selected_country = None
             st.session_state.pin_lat = None
