@@ -179,8 +179,11 @@
           return 'rgba(0,0,0,0)';
       });
 
-      // 3. Update Pin (Only display when borders are OFF)
-      if (!args.show_borders && args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
+      // 3. Update Pin & Radar Ping
+      const hasPin = args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined;
+
+      if (!args.show_borders && hasPin) {
+          // MODE: Without Borders -> Show your custom '×'
           globe.htmlElementsData([{ lat: args.pin_lat, lng: args.pin_lon }])
                .htmlLat(d => d.lat)
                .htmlLng(d => d.lng)
@@ -192,12 +195,27 @@
                    el.style.fontWeight = 'bold';
                    el.style.lineHeight = '1';
                    el.style.transform = 'translate(-50%, -50%)';
-                   el.style.pointerEvents = 'none'; // let clicks pass through to the globe
-                   el.style.textShadow = '0 0 3px rgba(0,0,0,0.9)'; // stay visible on light land too
+                   el.style.pointerEvents = 'none'; 
+                   el.style.textShadow = '0 0 3px rgba(0,0,0,0.9)'; 
                    return el;
                });
+               
+          globe.ringsData([]); // Clear any radar pings
+          
+      } else if (args.show_borders && hasPin) {
+          // MODE: With Borders -> Show the animated Radar Ping
+          globe.htmlElementsData([]); // Clear your custom '×'
+          
+          globe.ringsData([{ lat: args.pin_lat, lng: args.pin_lon }])
+               .ringColor(() => 'rgba(255, 215, 0, 0.8)') // Glowing Gold
+               .ringMaxRadius(3)         // Radius in degrees (3 = ~200 miles wide!)
+               .ringPropagationSpeed(2)  // Speed of the ripple expansion
+               .ringRepeatPeriod(800);   // Spawns a new ripple every 0.8 seconds
+               
       } else {
+          // Clear everything when the round resets
           globe.htmlElementsData([]);
+          globe.ringsData([]);
       }
      
     });
