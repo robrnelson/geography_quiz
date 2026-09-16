@@ -7,22 +7,6 @@ import math
 
 st.set_page_config(page_title="Geography Quiz", layout="wide")
 
-# A dictionary of small countries/islands and their approximate Lat/Lon centers.
-# Make sure the spelling matches your GeoJSON exactly!
-SMALL_COUNTRIES = {
-    "Fiji": (-17.7134, 178.0650),
-    "Bahamas": (25.0343, -77.3963),
-    "Vanuatu": (-15.3767, 166.9592),
-    "Cyprus": (35.1264, 33.4299),
-    "Luxembourg": (49.8153, 6.1296),
-    "Jamaica": (18.1096, -77.2975),
-    "Qatar": (25.3548, 51.1839),
-    "Brunei": (4.5353, 114.7277),
-    "Kuwait": (29.3117, 47.4818),
-    "Falkland Islands": (-51.7963, -59.5236)
-    # If you upgrade to the 50m dataset later, you can add "Vatican", "Monaco", etc. here!
-}
-
 def haversine_distance(lat1, lon1, lat2, lon2):
     """Calculates the distance in miles between two lat/lon points."""
     R = 3958.8 # Radius of Earth in miles
@@ -44,6 +28,7 @@ if "last_click_id" not in st.session_state:
 if "last_correct_country" not in st.session_state:
     st.session_state.last_correct_country = None
 
+'''
 @st.cache_data
 def get_country_names():
     # Natural Earth 1:50m admin-0 countries: much higher-detail borders
@@ -57,7 +42,41 @@ def get_country_names():
     return [f["properties"]["ADMIN"] for f in data["features"] if f["properties"]["ADMIN"] != "Antarctica"]
 
 country_names = get_country_names()
+'''
 
+# --- NEW DATA LOADER ---
+@st.cache_data
+def load_geo_data():
+    url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson"
+    response = requests.get(url)
+    data = response.json()
+    
+    names = []
+    coastlines = {}
+    
+    for f in data["features"]:
+        name = f["properties"]["ADMIN"]
+        if name == "Antarctica": continue
+        names.append(name)
+        
+        # Extract every single coordinate on this country's border/coastline
+        geom = f["geometry"]
+        vertices = []
+        if geom["type"] == "Polygon":
+            for ring in geom["coordinates"]:
+                for lon, lat in ring:
+                    vertices.append((lat, lon))
+        elif geom["type"] == "MultiPolygon":
+            for poly in geom["coordinates"]:
+                for ring in poly:
+                    for lon, lat in ring:
+                        vertices.append((lat, lon))
+                        
+        coastlines[name] = vertices
+        
+    return names, coastlines
+
+country_names, country_coastlines = load_geo_data()
 
 # Session State
 if "score" not in st.session_state:
@@ -120,7 +139,7 @@ click_data = globe_component(
     default=None
 )
 
-# Click Logic (with Ghost-Click prevention & Forgiving Click)
+# Click Logic (with Ghost-Click prevention & Coastline Magnet)
 if click_data:
     current_click_id = click_data.get("click_id")
     
@@ -133,25 +152,34 @@ if click_data:
         
         st.session_state.pin_lat = click_lat
         st.session_state.pin_lon = click_lon
-        st.session_state.last_correct_country = None # Clear previous highlight
+        st.session_state.last_correct_country = None 
         
-        # --- THE FORGIVING CLICK (MAGNET EFFECT) ---
+        # --- THE UNIVERSAL COASTLINE MAGNET ---
         snapped_country = None
-        min_distance = float('inf')
-        SNAP_RADIUS_MILES = 100 
         
-        for name, coords in SMALL_COUNTRIES.items():
-            dist = haversine_distance(click_lat, click_lon, coords[0], coords[1])
-            if dist < SNAP_RADIUS_MILES and dist < min_distance:
-                snapped_country = name
-                min_distance = dist
-                
-        # If the click was close to a small island, override the raw click!
-        if snapped_country:
-            st.session_state.selected_country = snapped_country
-        else:
-            st.session_state.selected_country = raw_country
-        # -------------------------------------------
+        # Only trigger the magnet if they missed and clicked the ocean
+        if not raw_country: 
+            min_distance = float('inf')
+            SNAP_RADIUS_MILES = 60 # Snaps to any coastline within 60 miles
+            
+            for name, vertices in country_coastlines.items():
+                for v_lat, v_lon in vertices:
+                    # Quick math filter: Skip checking if the coordinate is obviously too far away
+                    lon_diff = abs(v_lon - click_lon)
+                    if lon_diff > 180: # Handle the International Date Line
+                        lon_diff = 360 - lon_diff
+                        
+                    if abs(v_lat - click_lat) > 2 or lon_diff > 2:
+                        continue
+                        
+                    # If it's nearby, do the precise curve-of-the-earth calculation
+                    dist = haversine_distance(click_lat, click_lon, v_lat, v_lon)
+                    if dist < SNAP_RADIUS_MILES and dist < min_distance:
+                        snapped_country = name
+                        min_distance = dist
+                        
+        st.session_state.selected_country = snapped_country if snapped_country else raw_country
+        # --------------------------------------
 
         if not st.session_state.selected_country:
             st.session_state.message = "🌊 You clicked the ocean! Please click a landmass."
