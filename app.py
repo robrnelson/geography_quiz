@@ -3,8 +3,34 @@ import streamlit.components.v1 as components
 import requests
 import random
 import os
+import math
 
 st.set_page_config(page_title="Geography Quiz", layout="wide")
+
+# A dictionary of small countries/islands and their approximate Lat/Lon centers.
+# Make sure the spelling matches your GeoJSON exactly!
+SMALL_COUNTRIES = {
+    "Fiji": (-17.7134, 178.0650),
+    "Bahamas": (25.0343, -77.3963),
+    "Vanuatu": (-15.3767, 166.9592),
+    "Cyprus": (35.1264, 33.4299),
+    "Luxembourg": (49.8153, 6.1296),
+    "Jamaica": (18.1096, -77.2975),
+    "Qatar": (25.3548, 51.1839),
+    "Brunei": (4.5353, 114.7277),
+    "Kuwait": (29.3117, 47.4818),
+    "Falkland Islands": (-51.7963, -59.5236)
+    # If you upgrade to the 50m dataset later, you can add "Vatican", "Monaco", etc. here!
+}
+
+def haversine_distance(lat1, lon1, lat2, lon2):
+    """Calculates the distance in miles between two lat/lon points."""
+    R = 3958.8 # Radius of Earth in miles
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
 
 # Connect Python to HTML
 parent_dir = os.path.dirname(os.path.abspath(__file__))
@@ -94,20 +120,39 @@ click_data = globe_component(
     default=None
 )
 
-# Click Logic
+# Click Logic (with Ghost-Click prevention & Forgiving Click)
 if click_data:
     current_click_id = click_data.get("click_id")
     
-    # Only process the click if the timestamp proves it is a genuinely NEW physical click
     if current_click_id and current_click_id != st.session_state.last_click_id:
         st.session_state.last_click_id = current_click_id
         
-        st.session_state.pin_lat = click_data.get("lat")
-        st.session_state.pin_lon = click_data.get("lon")
-        st.session_state.selected_country = click_data.get("country")
-
-        st.session_state.last_correct_country = None
+        click_lat = click_data.get("lat")
+        click_lon = click_data.get("lon")
+        raw_country = click_data.get("country")
         
+        st.session_state.pin_lat = click_lat
+        st.session_state.pin_lon = click_lon
+        st.session_state.last_correct_country = None # Clear previous highlight
+        
+        # --- THE FORGIVING CLICK (MAGNET EFFECT) ---
+        snapped_country = None
+        min_distance = float('inf')
+        SNAP_RADIUS_MILES = 100 
+        
+        for name, coords in SMALL_COUNTRIES.items():
+            dist = haversine_distance(click_lat, click_lon, coords[0], coords[1])
+            if dist < SNAP_RADIUS_MILES and dist < min_distance:
+                snapped_country = name
+                min_distance = dist
+                
+        # If the click was close to a small island, override the raw click!
+        if snapped_country:
+            st.session_state.selected_country = snapped_country
+        else:
+            st.session_state.selected_country = raw_country
+        # -------------------------------------------
+
         if not st.session_state.selected_country:
             st.session_state.message = "🌊 You clicked the ocean! Please click a landmass."
             st.session_state.message_type = "warning"
