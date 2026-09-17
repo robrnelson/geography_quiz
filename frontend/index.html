@@ -46,6 +46,9 @@
     // ---- TRUE 3D WEBGL GLOBE LOGIC ----
     let globe;
     let isGlobeReady = false;
+    let countriesData = []; // filled once the countries geojson loads; the
+                             // message handler below needs this too, to
+                             // look up a selected country's island shapes
 
     function initGlobe() {
         // Wait safely if the globe.gl library is still downloading over the network
@@ -73,6 +76,7 @@
               .then(res => res.json())
               .then(data => {
                  const countries = data.features.filter(f => f.properties.ADMIN !== "Antarctica");
+                 countriesData = countries;
                  globe.polygonsData(countries);
               });
 
@@ -131,6 +135,32 @@
         el.style.display = 'block';
     }
 
+    // One centroid per polygon - for a MultiPolygon (archipelago nations
+    // like Kiribati, Indonesia, etc.) this gives one point per landmass
+    // instead of a single country-wide centroid that could land in open
+    // ocean between scattered islands. Simple ring-vertex averaging is
+    // good enough for placing a small visual marker (not exact enough for
+    // hit-testing, but that's not what this is used for).
+    function polygonCentroids(geometry) {
+        let polygons;
+        if (geometry.type === 'MultiPolygon') {
+            polygons = geometry.coordinates;
+        } else if (geometry.type === 'Polygon') {
+            polygons = [geometry.coordinates];
+        } else {
+            return [];
+        }
+        return polygons.map(polygon => {
+            const ring = polygon[0]; // exterior ring; ignore holes for a centroid
+            let sumLon = 0, sumLat = 0;
+            for (const [lon, lat] of ring) {
+                sumLon += lon;
+                sumLat += lat;
+            }
+            return { lat: sumLat / ring.length, lng: sumLon / ring.length };
+        });
+    }
+
     // If globe.gl never loads (CDN blocked, offline, etc.) give up after
     // a while instead of retrying silently forever.
     let waitedMs = 0;
@@ -179,26 +209,49 @@
           return 'rgba(0,0,0,0)';
       });
 
-      // 3. Update Pin (Only display when borders are OFF)
+      // 3. Build HTML overlay markers: the click-location "x" pin, plus one
+      // small fixed-size marker per landmass for the selected country - an
+      // archipelago nation (e.g. Kiribati) is a MultiPolygon with one
+      // polygon per island/atoll, so a single country-wide centroid would
+      // often land in open ocean between them. Instead we compute one
+      // centroid per polygon, so every island gets its own dot.
+      // (three-globe only supports one htmlElementsData layer, so both
+      // marker kinds have to be merged into a single array here.)
+      const htmlPoints = [];
+
       if (!args.show_borders && args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
-          globe.htmlElementsData([{ lat: args.pin_lat, lng: args.pin_lon }])
-               .htmlLat(d => d.lat)
-               .htmlLng(d => d.lng)
-               .htmlElement(() => {
-                   const el = document.createElement('div');
+          htmlPoints.push({ kind: 'pin', lat: args.pin_lat, lng: args.pin_lon });
+      }
+
+      if (args.show_borders && args.selected_country) {
+          const feature = countriesData.find(f => getCountryName(f) === args.selected_country);
+          if (feature) {
+              for (const centroid of polygonCentroids(feature.geometry)) {
+                  htmlPoints.push({ kind: 'island', lat: centroid.lat, lng: centroid.lng });
+              }
+          }
+      }
+
+      globe.htmlElementsData(htmlPoints)
+           .htmlLat(d => d.lat)
+           .htmlLng(d => d.lng)
+           .htmlElement(d => {
+               const el = document.createElement('div');
+               el.style.color = 'white';
+               el.style.lineHeight = '1';
+               el.style.transform = 'translate(-50%, -50%)';
+               el.style.pointerEvents = 'none'; // let clicks pass through to the globe
+               el.style.textShadow = '0 0 3px rgba(0,0,0,0.9)'; // stay visible on light land too
+               if (d.kind === 'pin') {
                    el.textContent = '×';
-                   el.style.color = 'white';
                    el.style.fontSize = '18px';
                    el.style.fontWeight = 'bold';
-                   el.style.lineHeight = '1';
-                   el.style.transform = 'translate(-50%, -50%)';
-                   el.style.pointerEvents = 'none'; // let clicks pass through to the globe
-                   el.style.textShadow = '0 0 3px rgba(0,0,0,0.9)'; // stay visible on light land too
-                   return el;
-               });
-      } else {
-          globe.htmlElementsData([]);
-      }
+               } else {
+                   el.textContent = '●';
+                   el.style.fontSize = '9px';
+               }
+               return el;
+           });
      
     });
   </script>
