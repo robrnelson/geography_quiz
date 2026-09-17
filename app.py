@@ -88,7 +88,7 @@ def reset_round():
 # UI Setup
 st.title("Geography Quiz")
 
-game_mode = st.selectbox("Choose Border Mode:", ["Without borders", "With white borders"])
+game_mode = st.selectbox("Choose Border Mode:", ["Without Borders", "With Borders"])
 show_borders = (game_mode == "With white borders")
 
 st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
