@@ -251,7 +251,7 @@
       // instead we get one centroid per polygon, and only mark the ones
       // small enough to actually need help being seen (see SMALL_POLYGON
       // threshold below), so large countries don't get a distracting dot.
-      const SMALL_POLYGON_MAX_EXTENT_DEG = 3; // tune this to taste
+      const SMALL_POLYGON_MAX_EXTENT_DEG = 1; // tune this to taste
       const htmlPoints = [];
 
       if (!args.show_borders && args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
