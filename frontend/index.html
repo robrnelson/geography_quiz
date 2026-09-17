@@ -141,6 +141,31 @@
     // ocean between scattered islands. Simple ring-vertex averaging is
     // good enough for placing a small visual marker (not exact enough for
     // hit-testing, but that's not what this is used for).
+    // Generates a closed ring of [lat, lng] points forming a circle of the
+    // given real-world radius (km) around a center point, using proper
+    // spherical destination-point math (not a flat lat/lng offset, which
+    // would distort into an ellipse away from the equator).
+    const EARTH_RADIUS_KM = 6371;
+    function geoCircle(centerLat, centerLng, radiusKm, numPoints = 48) {
+        const lat1 = centerLat * Math.PI / 180;
+        const lon1 = centerLng * Math.PI / 180;
+        const angularDist = radiusKm / EARTH_RADIUS_KM;
+        const points = [];
+        for (let i = 0; i <= numPoints; i++) {
+            const bearing = (i / numPoints) * 2 * Math.PI;
+            const lat2 = Math.asin(
+                Math.sin(lat1) * Math.cos(angularDist) +
+                Math.cos(lat1) * Math.sin(angularDist) * Math.cos(bearing)
+            );
+            const lon2 = lon1 + Math.atan2(
+                Math.sin(bearing) * Math.sin(angularDist) * Math.cos(lat1),
+                Math.cos(angularDist) - Math.sin(lat1) * Math.sin(lat2)
+            );
+            points.push([lat2 * 180 / Math.PI, lon2 * 180 / Math.PI]);
+        }
+        return points;
+    }
+
     function polygonCentroids(geometry) {
         let polygons;
         if (geometry.type === 'MultiPolygon') {
@@ -153,11 +178,20 @@
         return polygons.map(polygon => {
             const ring = polygon[0]; // exterior ring; ignore holes for a centroid
             let sumLon = 0, sumLat = 0;
+            let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
             for (const [lon, lat] of ring) {
                 sumLon += lon;
                 sumLat += lat;
+                if (lon < minLon) minLon = lon;
+                if (lon > maxLon) maxLon = lon;
+                if (lat < minLat) minLat = lat;
+                if (lat > maxLat) maxLat = lat;
             }
-            return { lat: sumLat / ring.length, lng: sumLon / ring.length };
+            // rough "how big does this look" proxy: the larger of the two
+            // bounding-box spans, in degrees. Not a real geodesic area, but
+            // good enough to tell a tiny atoll from a large landmass.
+            const extentDeg = Math.max(maxLon - minLon, maxLat - minLat);
+            return { lat: sumLat / ring.length, lng: sumLon / ring.length, extentDeg };
         });
     }
 
@@ -209,14 +243,15 @@
           return 'rgba(0,0,0,0)';
       });
 
-      // 3. Build HTML overlay markers: the click-location "x" pin, plus one
-      // small fixed-size marker per landmass for the selected country - an
-      // archipelago nation (e.g. Kiribati) is a MultiPolygon with one
-      // polygon per island/atoll, so a single country-wide centroid would
-      // often land in open ocean between them. Instead we compute one
-      // centroid per polygon, so every island gets its own dot.
-      // (three-globe only supports one htmlElementsData layer, so both
-      // marker kinds have to be merged into a single array here.)
+      // 3. HTML overlay markers, fixed on-screen size regardless of zoom:
+      // the click-location "x" pin, plus a gold dot on each small landmass
+      // of the selected country. An archipelago nation (e.g. Kiribati) is a
+      // MultiPolygon with one polygon per island/atoll, so a single
+      // country-wide centroid would often land in open ocean between them -
+      // instead we get one centroid per polygon, and only mark the ones
+      // small enough to actually need help being seen (see SMALL_POLYGON
+      // threshold below), so large countries don't get a distracting dot.
+      const SMALL_POLYGON_MAX_EXTENT_DEG = 3; // tune this to taste
       const htmlPoints = [];
 
       if (!args.show_borders && args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
@@ -226,8 +261,10 @@
       if (args.show_borders && args.selected_country) {
           const feature = countriesData.find(f => getCountryName(f) === args.selected_country);
           if (feature) {
-              for (const centroid of polygonCentroids(feature.geometry)) {
-                  htmlPoints.push({ kind: 'island', lat: centroid.lat, lng: centroid.lng });
+              for (const c of polygonCentroids(feature.geometry)) {
+                  if (c.extentDeg <= SMALL_POLYGON_MAX_EXTENT_DEG) {
+                      htmlPoints.push({ kind: 'island', lat: c.lat, lng: c.lng });
+                  }
               }
           }
       }
@@ -237,18 +274,19 @@
            .htmlLng(d => d.lng)
            .htmlElement(d => {
                const el = document.createElement('div');
-               el.style.color = 'white';
                el.style.lineHeight = '1';
                el.style.transform = 'translate(-50%, -50%)';
                el.style.pointerEvents = 'none'; // let clicks pass through to the globe
                el.style.textShadow = '0 0 3px rgba(0,0,0,0.9)'; // stay visible on light land too
                if (d.kind === 'pin') {
                    el.textContent = '×';
+                   el.style.color = 'white';
                    el.style.fontSize = '18px';
                    el.style.fontWeight = 'bold';
                } else {
                    el.textContent = '●';
-                   el.style.fontSize = '9px';
+                   el.style.color = '#FFD700'; // gold, matching the active-guess highlight color
+                   el.style.fontSize = '13px';
                }
                return el;
            });
