@@ -89,7 +89,7 @@ def reset_round():
 st.title("Geography Quiz")
 
 game_mode = st.selectbox("Choose Border Mode:", ["Without Borders", "With Borders"])
-show_borders = (game_mode == "With white borders")
+show_borders = (game_mode == "With Borders")
 
 st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
 st.markdown(f"**Score:** {st.session_state.score}")
