@@ -108,30 +108,55 @@ if "last_click_id" not in st.session_state:
     st.session_state.last_click_id = None
 
 # --- UI SETUP ---
-col1, col2 = st.columns([1, 2], vertical_alignment="center")
-with col1:
-    st.markdown("**Choose Game Mode:**")
-with col2:
+# 1. CSS Injection to remove dead space and force side-by-side mobile buttons
+st.markdown("""
+    <style>
+    /* Remove massive empty space at the top of the app */
+    .block-container {
+        padding-top: 1rem !important;
+        padding-bottom: 0rem !important;
+    }
+    /* Force all Streamlit columns to NEVER stack vertically on phones */
+    [data-testid="stHorizontalBlock"] {
+        flex-wrap: nowrap !important;
+    }
+    /* Allow columns to shrink to fit side-by-side */
+    [data-testid="column"] {
+        min-width: 0 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# 2. Top Row: Game Mode & Score (Side-by-Side)
+top_col1, top_col2 = st.columns([2, 1], vertical_alignment="center")
+with top_col1:
     game_mode = st.selectbox(
-        "Choose Game Mode:", 
+        "Mode:", 
         ["With Borders", "Without Borders", "City Mode"], 
         label_visibility="collapsed"
     )
-    
+with top_col2:
+    if game_mode == "City Mode":
+        st.write(f"**Score:** {st.session_state.city_score:,.0f} mi")
+    else:
+        st.write(f"**Score:** {st.session_state.score}")
+
 show_borders = (game_mode == "With Borders")
 
+# 3. Middle Row: The Target (Using standard text instead of bulky headers)
 if game_mode == "City Mode":
-    st.markdown(f"### 🎯 Drop a pin on: **{st.session_state.target_city}**")
-    st.markdown(f"**Total Distance Score:** {st.session_state.city_score:,.0f} miles")
+    st.write(f"🎯 Drop pin on: **{st.session_state.target_city}**")
 else:
-    st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
-    st.markdown(f"**Score:** {st.session_state.score}")
+    st.write(f"🎯 Find: **{st.session_state.target_country}**")
 
+# 4. Bottom Row: Action Buttons
 btn_col1, btn_col2 = st.columns(2)
 with btn_col1:
     submit_clicked = st.button("Submit Guess", use_container_width=True, type="primary")
 with btn_col2:
     skip_clicked = st.button("Skip", use_container_width=True)
+
+
 
 if st.session_state.message:
     if st.session_state.message_type == "success":
@@ -252,19 +277,21 @@ if submit_clicked:
             st.rerun()
 
 elif skip_clicked:
+    # Pick a new target
     if game_mode == "City Mode":
-        st.session_state.message = f"⏭️ Skipped! The city was {st.session_state.target_city}."
-        st.session_state.message_type = "warning"
         st.session_state.target_city = random.choice(list(CITIES.keys()))
     else:
-        st.session_state.message = f"⏭️ Skipped! The country was {st.session_state.target_country}."
-        st.session_state.message_type = "warning"
         st.session_state.target_country = random.choice(country_names)
         
+    # Clear all messages so nothing displays
+    st.session_state.message = ""
+    
+    # Reset all map selections
     st.session_state.selected_country = None
     st.session_state.last_correct_country = None
     st.session_state.pin_lat = None
     st.session_state.pin_lon = None
     st.session_state.actual_lat = None
     st.session_state.actual_lon = None
+    
     st.rerun()
