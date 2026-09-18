@@ -108,20 +108,32 @@ if "last_click_id" not in st.session_state:
     st.session_state.last_click_id = None
 
 # --- UI SETUP ---
-# 1. CSS Injection to remove dead space and force side-by-side mobile buttons
+# 1. CSS Injection for a native mobile app feel
 st.markdown("""
     <style>
-    /* Remove massive empty space at the top of the app */
-    .block-container {
-        padding-top: 1rem !important;
-        padding-bottom: 0rem !important;
+    /* Completely hide the Streamlit top menu bar */
+    header[data-testid="stHeader"] {
+        display: none !important;
     }
-    /* Force all Streamlit columns to NEVER stack vertically on phones */
+    
+    /* Remove empty space but prevent content from hitting the raw edges */
+    .block-container {
+        padding-top: 1.5rem !important;
+        padding-bottom: 0rem !important;
+        padding-left: 0.5rem !important;
+        padding-right: 0.5rem !important;
+        overflow-x: hidden !important; /* Hard-stop any horizontal scrolling */
+    }
+    
+    /* Force columns to stay on one line AND shrink to fit the screen */
     [data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
+        gap: 0.5rem !important; 
     }
-    /* Allow columns to shrink to fit side-by-side */
+    
+    /* Mathematically force the buttons to share the exact screen width */
     [data-testid="column"] {
+        flex: 1 1 0% !important;
         min-width: 0 !important;
     }
     </style>
@@ -143,7 +155,7 @@ with top_col2:
 
 show_borders = (game_mode == "With Borders")
 
-# 3. Middle Row: The Target (Using standard text instead of bulky headers)
+# 3. Middle Row: The Target
 if game_mode == "City Mode":
     st.write(f"🎯 Drop pin on: **{st.session_state.target_city}**")
 else:
@@ -155,7 +167,6 @@ with btn_col1:
     submit_clicked = st.button("Submit Guess", use_container_width=True, type="primary")
 with btn_col2:
     skip_clicked = st.button("Skip", use_container_width=True)
-
 
 
 if st.session_state.message:
