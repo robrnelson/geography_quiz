@@ -6,8 +6,6 @@
   <style>
     body { margin: 0; padding: 0; overflow: hidden; background-color: transparent; }
     #globeViz { width: 100vw; height: 100vh; position: relative; }
-    /* Force the canvas three.js creates to actually fill its container,
-       in case it was sized from a stale/zero measurement at creation time */
     #globeViz canvas {
       display: block !important;
       width: 100% !important;
@@ -22,7 +20,7 @@
   <div id="globeViz"></div>
   <div id="globeError" style="display:none; color:#f66; font-family:sans-serif; padding:20px;"></div>
   <script>
-    // ---- MINIMAL STREAMLIT COMPONENT PROTOCOL (From Claude) ----
+    // ---- MINIMAL STREAMLIT COMPONENT PROTOCOL ----
     function sendToStreamlit(type, data) {
       const payload = Object.assign({ isStreamlitMessage: true, type: type }, data);
       window.parent.postMessage(payload, "*");
@@ -37,7 +35,6 @@
       sendToStreamlit("streamlit:setComponentValue", { value: value, dataType: "json" });
     }
 
-    // IMMEDIATELY tell Python we are alive to prevent timeouts!
     componentReady();
     setFrameHeight(600);
 
@@ -46,12 +43,9 @@
     // ---- TRUE 3D WEBGL GLOBE LOGIC ----
     let globe;
     let isGlobeReady = false;
-    let countriesData = []; // filled once the countries geojson loads; the
-                             // message handler below needs this too, to
-                             // look up a selected country's island shapes
+    let countriesData = []; 
 
     function initGlobe() {
-        // Wait safely if the globe.gl library is still downloading over the network
         if (typeof Globe === 'undefined') {
             setTimeout(initGlobe, 50);
             return;
@@ -60,18 +54,14 @@
         try {
             globe = Globe()(document.getElementById('globeViz'))
               .showGlobe(true)
-              .globeImageUrl('./earth-highres.jpg') // The NASA Texture!
+              .globeImageUrl('./earth-highres.jpg') 
               .backgroundColor('rgba(0,0,0,0)')
               .polygonAltitude(0.0008)
-              .polygonCapCurvatureResolution(1) // finer cap tessellation - hugs the sphere closely
-                                                 // so large countries (Russia, Canada, etc.) don't
-                                                 // sink below the surface at near-zero altitude
-              .polygonCapColor(() => 'rgba(0,0,0,0)') // Completely transparent default land
+              .polygonCapCurvatureResolution(1)
+              .polygonCapColor(() => 'rgba(0,0,0,0)')
               .polygonSideColor(() => 'rgba(0,0,0,0)')
               .polygonStrokeColor(() => 'rgba(0,0,0,0)');
           
-            // Fetch 110m Optimized GeoJSON Data
-            //fetch('https://raw.githubusercontent.com/python-visualization/folium/master/examples/data/world-countries.json')
             fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson')
               .then(res => res.json())
               .then(data => {
@@ -80,7 +70,6 @@
                  globe.polygonsData(countries);
               });
 
-            // Handle Clicks with click_id
             globe.onPolygonClick((polygon, event, coords) => {
                 sendValue({
                     country: polygon.properties.ADMIN,
@@ -99,17 +88,9 @@
                 });
             });
 
-            // Turn off the drifting/momentum effect
             globe.controls().enableDamping = false;
-          
             isGlobeReady = true;
 
-            // Defensive fix: three.js/globe.gl sizes its renderer from the
-            // container's dimensions at the exact moment Globe() is called.
-            // If the iframe hadn't finished being sized by Streamlit yet at
-            // that instant, the canvas can end up locked at a stale/zero
-            // resolution even though the container looks fine afterward.
-            // Re-assert the real size now, shortly after, and on resize.
             function resyncGlobeSize() {
                 const el = document.getElementById('globeViz');
                 const w = el.clientWidth || window.innerWidth;
@@ -135,16 +116,6 @@
         el.style.display = 'block';
     }
 
-    // One centroid per polygon - for a MultiPolygon (archipelago nations
-    // like Kiribati, Indonesia, etc.) this gives one point per landmass
-    // instead of a single country-wide centroid that could land in open
-    // ocean between scattered islands. Simple ring-vertex averaging is
-    // good enough for placing a small visual marker (not exact enough for
-    // hit-testing, but that's not what this is used for).
-    // Generates a closed ring of [lat, lng] points forming a circle of the
-    // given real-world radius (km) around a center point, using proper
-    // spherical destination-point math (not a flat lat/lng offset, which
-    // would distort into an ellipse away from the equator).
     const EARTH_RADIUS_KM = 6371;
     function geoCircle(centerLat, centerLng, radiusKm, numPoints = 48) {
         const lat1 = centerLat * Math.PI / 180;
@@ -176,7 +147,7 @@
             return [];
         }
         return polygons.map(polygon => {
-            const ring = polygon[0]; // exterior ring; ignore holes for a centroid
+            const ring = polygon[0];
             let sumLon = 0, sumLat = 0;
             let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity;
             for (const [lon, lat] of ring) {
@@ -187,16 +158,11 @@
                 if (lat < minLat) minLat = lat;
                 if (lat > maxLat) maxLat = lat;
             }
-            // rough "how big does this look" proxy: the larger of the two
-            // bounding-box spans, in degrees. Not a real geodesic area, but
-            // good enough to tell a tiny atoll from a large landmass.
             const extentDeg = Math.max(maxLon - minLon, maxLat - minLat);
             return { lat: sumLat / ring.length, lng: sumLon / ring.length, extentDeg };
         });
     }
 
-    // If globe.gl never loads (CDN blocked, offline, etc.) give up after
-    // a while instead of retrying silently forever.
     let waitedMs = 0;
     const ORIGINAL_INIT = initGlobe;
     initGlobe = function () {
@@ -212,7 +178,6 @@
         ORIGINAL_INIT();
     };
 
-    // Start building the globe
     initGlobe();
 
     // ---- HANDLE DATA SENT FROM PYTHON ----
@@ -220,9 +185,9 @@
       if (!event.data || event.data.type !== "streamlit:render") return;
       
       const args = event.data.args || {};
-      if (!isGlobeReady) return; // Safety check
+      if (!isGlobeReady) return; 
 
-      // 1. Swap the Background Texture!
+      // 1. Swap the Background Texture
       if (args.show_borders) {
           globe.globeImageUrl('./earth-highres-bordered.jpg');
       } else {
@@ -232,33 +197,53 @@
       // 2. Highlight the Selected Country
       globe.polygonCapColor(d => {
           const name = getCountryName(d);
-          // ALWAYS show the green highlight for a correct guess, even if borders are off!
           if (args.last_correct_country && name === args.last_correct_country) {
-              return 'rgba(50, 255, 50, 0.6)'; // Green for previous correct answer
+              return 'rgba(50, 255, 50, 0.6)';  
           }
-          
-          // Only show the golden active guess highlight if borders are ON
           if (args.show_borders && args.selected_country && name === args.selected_country) {
-              return 'rgba(255, 215, 0, 0.6)'; // Gold for active guess
+              return 'rgba(255, 215, 0, 0.6)'; 
           }
           return 'rgba(0,0,0,0)';
       });
 
-      // 3. HTML overlay markers, fixed on-screen size regardless of zoom:
-      // the click-location "x" pin, plus a gold dot on each small landmass
-      // of the selected country. An archipelago nation (e.g. Kiribati) is a
-      // MultiPolygon with one polygon per island/atoll, so a single
-      // country-wide centroid would often land in open ocean between them -
-      // instead we get one centroid per polygon, and only mark the ones
-      // small enough to actually need help being seen (see SMALL_POLYGON
-      // threshold below), so large countries don't get a distracting dot.
-      const SMALL_POLYGON_MAX_EXTENT_DEG = 1; // tune this to taste
+      // 3. HTML overlay markers, Pins, and Arcs!
+      const hasPin = args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined;
+      const isCityReveal = args.actual_lat !== null && args.actual_lat !== undefined;
       const htmlPoints = [];
 
-      if (!args.show_borders && args.pin_lat !== null && args.pin_lon !== null && args.pin_lat !== undefined) {
-          htmlPoints.push({ kind: 'pin', lat: args.pin_lat, lng: args.pin_lon });
+      // Ensure any leftover rings are permanently cleared
+      globe.ringsData([]);
+
+      // A) City Mode Reveal 
+      if (isCityReveal) {
+          htmlPoints.push({ kind: 'city_guess', lat: args.pin_lat, lng: args.pin_lon });
+          htmlPoints.push({ kind: 'city_actual', lat: args.actual_lat, lng: args.actual_lon });
+          
+          globe.arcsData([{
+               startLat: args.pin_lat, startLng: args.pin_lon,
+               endLat: args.actual_lat, endLng: args.actual_lon
+          }])
+          .arcStartLat(d => d.startLat)
+          .arcStartLng(d => d.startLng)
+          .arcEndLat(d => d.endLat)
+          .arcEndLng(d => d.endLng)
+          .arcColor(() => ['rgba(255, 50, 50, 0.8)', 'rgba(50, 255, 50, 0.8)']) 
+          .arcDashLength(0.4)
+          .arcDashGap(0.2)
+          .arcDashAnimateTime(1500)
+          .arcAltitudeAutoScale(0.3);
+          
+      } else {
+          globe.arcsData([]); // clear arcs
+          
+          // B) Standard Country Mode Pins
+          if (!args.show_borders && hasPin) {
+              htmlPoints.push({ kind: 'pin', lat: args.pin_lat, lng: args.pin_lon });
+          }
       }
 
+      // C) Small Island Dots
+      const SMALL_POLYGON_MAX_EXTENT_DEG = 1;
       if (args.show_borders && args.selected_country) {
           const feature = countriesData.find(f => getCountryName(f) === args.selected_country);
           if (feature) {
@@ -270,6 +255,7 @@
           }
       }
 
+      // Render all HTML elements dynamically
       globe.htmlElementsData(htmlPoints)
            .htmlLat(d => d.lat)
            .htmlLng(d => d.lng)
@@ -277,17 +263,26 @@
                const el = document.createElement('div');
                el.style.lineHeight = '1';
                el.style.transform = 'translate(-50%, -50%)';
-               el.style.pointerEvents = 'none'; // let clicks pass through to the globe
-               el.style.textShadow = '0 0 3px rgba(0,0,0,0.9)'; // stay visible on light land too
+               el.style.pointerEvents = 'none';
+               el.style.textShadow = '0 0 3px rgba(0,0,0,0.9)';
+               
                if (d.kind === 'pin') {
                    el.textContent = '×';
                    el.style.color = 'white';
                    el.style.fontSize = '18px';
                    el.style.fontWeight = 'bold';
-               } else {
+               } else if (d.kind === 'island') {
                    el.textContent = '●';
-                   el.style.color = '#FFD700'; // gold, matching the active-guess highlight color
+                   el.style.color = '#FFD700';
                    el.style.fontSize = '13px';
+               } else if (d.kind === 'city_guess') {
+                   el.textContent = '❌';
+                   el.style.color = '#ff3333';
+                   el.style.fontSize = '20px';
+               } else if (d.kind === 'city_actual') {
+                   el.textContent = '⭐';
+                   el.style.color = '#33ff33';
+                   el.style.fontSize = '20px';
                }
                return el;
            });
