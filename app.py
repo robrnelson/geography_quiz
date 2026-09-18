@@ -2,62 +2,19 @@ import streamlit as st
 import streamlit.components.v1 as components
 import requests
 import random
-import os
 import math
+import os
 
-st.set_page_config(page_title="Geography Quiz", layout="wide")
+# --- PAGE CONFIG ---
+st.set_page_config(layout="wide")
 
-def haversine_distance(lat1, lon1, lat2, lon2):
-    """Calculates the distance in miles between two lat/lon points."""
-    R = 3958.8 # Radius of Earth in miles
-    dlat = math.radians(lat2 - lat1)
-    dlon = math.radians(lon2 - lon1)
-    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
-    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
-    return R * c
-
-@st.cache_data
-def load_cities():
-    # Natural Earth 50m Populated Places dataset
-    url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_populated_places_simple.geojson"
-    response = requests.get(url)
-    data = response.json()
-    
-    cities_dict = {}
-    for f in data["features"]:
-        props = f["properties"]
-        name = props.get("name")
-        country = props.get("adm0name")
-        pop = props.get("pop_max", 0)
-        
-        # Filter for major cities to keep the game playable (e.g., > 1,000,000 people)
-        # Lower this number to make the game drastically harder!
-        if pop > 10000: 
-            coords = f["geometry"]["coordinates"]
-            # GeoJSON stores as [longitude, latitude], so we flip them for your logic
-            lon, lat = coords[0], coords[1]
-            
-            # Formats as "Tokyo, Japan"
-            cities_dict[f"{name}, {country}"] = (lat, lon)
-            
-    return cities_dict
-
-# Replace the hardcoded dictionary with this function call:
-CITIES = load_cities()
-
-# Connect Python to HTML
+# --- COMPONENT SETUP ---
+# Adjust the path if your index.html is located elsewhere
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
-globe_component = components.declare_component("custom_globe", path=frontend_dir)
+globe_component = components.declare_component("globe_component", path=frontend_dir)
 
-# Session State
-if "last_click_id" not in st.session_state:
-    st.session_state.last_click_id = None
-
-if "last_correct_country" not in st.session_state:
-    st.session_state.last_correct_country = None
-
-# --- NEW DATA LOADER ---
+# --- DATA LOADERS ---
 @st.cache_data
 def load_geo_data():
     url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson"
@@ -69,10 +26,10 @@ def load_geo_data():
     
     for f in data["features"]:
         name = f["properties"]["ADMIN"]
-        if name == "Antarctica": continue
+        if name == "Antarctica": 
+            continue
         names.append(name)
         
-        # Extract every single coordinate on this country's border/coastline
         geom = f["geometry"]
         vertices = []
         if geom["type"] == "Polygon":
@@ -89,47 +46,78 @@ def load_geo_data():
         
     return names, coastlines
 
-country_names, country_coastlines = load_geo_data()
+@st.cache_data
+def load_cities():
+    url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_populated_places_simple.geojson"
+    response = requests.get(url)
+    data = response.json()
+    
+    cities_dict = {}
+    for f in data["features"]:
+        props = f["properties"]
+        name = props.get("name")
+        country = props.get("adm0name")
+        pop = props.get("pop_max", 0)
+        
+        if pop > 1000000: 
+            coords = f["geometry"]["coordinates"]
+            lon, lat = coords[0], coords[1]
+            cities_dict[f"{name}, {country}"] = (lat, lon)
+            
+    return cities_dict
 
-# Session State
-if "score" not in st.session_state:
-    st.session_state.score = 0
+def haversine_distance(lat1, lon1, lat2, lon2):
+    R = 3958.8 
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat / 2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon / 2)**2
+    c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+    return R * c
+
+country_names, country_coastlines = load_geo_data()
+CITIES = load_cities()
+
+# --- SESSION STATE INITIALIZATION ---
 if "target_country" not in st.session_state:
     st.session_state.target_country = random.choice(country_names)
-if "message" not in st.session_state:
-    st.session_state.message = ""
-if "message_type" not in st.session_state:
-    st.session_state.message_type = "info"
+if "target_city" not in st.session_state:
+    st.session_state.target_city = random.choice(list(CITIES.keys()))
+if "score" not in st.session_state:
+    st.session_state.score = 0
+if "city_score" not in st.session_state:
+    st.session_state.city_score = 0
+
 if "selected_country" not in st.session_state:
     st.session_state.selected_country = None
+if "last_correct_country" not in st.session_state:
+    st.session_state.last_correct_country = None
 if "pin_lat" not in st.session_state:
     st.session_state.pin_lat = None
 if "pin_lon" not in st.session_state:
     st.session_state.pin_lon = None
-if "target_city" not in st.session_state:
-    st.session_state.target_city = random.choice(list(CITIES.keys()))
-if "city_score" not in st.session_state:
-    st.session_state.city_score = 0
 if "actual_lat" not in st.session_state:
     st.session_state.actual_lat = None
 if "actual_lon" not in st.session_state:
     st.session_state.actual_lon = None
 
-def reset_round():
-    st.session_state.target_country = random.choice(country_names)
-    st.session_state.target_city = random.choice(list(CITIES.keys()))
-    st.session_state.selected_country = None
-    st.session_state.last_correct_country = None
-    st.session_state.pin_lat = None
-    st.session_state.pin_lon = None
-    st.session_state.actual_lat = None
-    st.session_state.actual_lon = None
+if "message" not in st.session_state:
     st.session_state.message = ""
+if "message_type" not in st.session_state:
+    st.session_state.message_type = "info"
+if "last_click_id" not in st.session_state:
+    st.session_state.last_click_id = None
 
-# UI Setup
-#st.title("Geography Quizes")
-
-game_mode = st.selectbox("Choose Game Mode:", ["With Borders", "Without Borders", "City Mode"])
+# --- UI SETUP ---
+col1, col2 = st.columns([1, 2], vertical_alignment="center")
+with col1:
+    st.markdown("**Choose Game Mode:**")
+with col2:
+    game_mode = st.selectbox(
+        "Choose Game Mode:", 
+        ["With Borders", "Without Borders", "City Mode"], 
+        label_visibility="collapsed"
+    )
+    
 show_borders = (game_mode == "With Borders")
 
 if game_mode == "City Mode":
@@ -138,45 +126,38 @@ if game_mode == "City Mode":
 else:
     st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
     st.markdown(f"**Score:** {st.session_state.score}")
-    
+
+btn_col1, btn_col2 = st.columns(2)
+with btn_col1:
+    submit_clicked = st.button("Submit Guess", use_container_width=True, type="primary")
+with btn_col2:
+    skip_clicked = st.button("Skip", use_container_width=True)
+
 if st.session_state.message:
     if st.session_state.message_type == "success":
         st.success(st.session_state.message)
-    elif st.session_state.message_type == "error":
-        st.error(st.session_state.message)
     elif st.session_state.message_type == "warning":
         st.warning(st.session_state.message)
-else:
-    st.info("👆 Click a country on the globe, then click Submit.")
+    else:
+        st.info(st.session_state.message)
 
-col1, col2 = st.columns(2)
-with col1:
-    submit_clicked = st.button("Submit Guess", type="primary", use_container_width=True)
-with col2:
-    if st.button("Skip / Next Country", use_container_width=True):
-        reset_round()
-        st.rerun()
-
-# Render Globe
+# --- GLOBE COMPONENT RENDER ---
 click_data = globe_component(
     show_borders=show_borders, 
     pin_lat=st.session_state.pin_lat, 
     pin_lon=st.session_state.pin_lon,
     selected_country=st.session_state.selected_country,
     last_correct_country=st.session_state.last_correct_country,
-    actual_lat=st.session_state.actual_lat, # NEW
-    actual_lon=st.session_state.actual_lon, # NEW
+    actual_lat=st.session_state.actual_lat,
+    actual_lon=st.session_state.actual_lon,
     key="globe_view",
     default=None
 )
 
-# Click Logic (with Ghost-Click prevention & Coastline Magnet)
+# --- CLICK LOGIC ---
 if click_data:
     current_click_id = click_data.get("click_id")
-
-    st.session_state.actual_lat = None
-    st.session_state.actual_lon = None
-
+    
     if current_click_id and current_click_id != st.session_state.last_click_id:
         st.session_state.last_click_id = current_click_id
         
@@ -186,36 +167,36 @@ if click_data:
         
         st.session_state.pin_lat = click_lat
         st.session_state.pin_lon = click_lon
-        st.session_state.last_correct_country = None 
         
-        # --- THE UNIVERSAL COASTLINE MAGNET ---
+        # Clear previous highlights/arcs on new click
+        st.session_state.last_correct_country = None 
+        st.session_state.actual_lat = None
+        st.session_state.actual_lon = None
+        
         snapped_country = None
         
-        # Only trigger the magnet if they missed and clicked the ocean
+        # Coastline Magnet Effect
         if not raw_country: 
             min_distance = float('inf')
-            SNAP_RADIUS_MILES = 60 # Snaps to any coastline within 60 miles
+            SNAP_RADIUS_MILES = 60 
             
             for name, vertices in country_coastlines.items():
                 for v_lat, v_lon in vertices:
-                    # Quick math filter: Skip checking if the coordinate is obviously too far away
                     lon_diff = abs(v_lon - click_lon)
-                    if lon_diff > 180: # Handle the International Date Line
+                    if lon_diff > 180:
                         lon_diff = 360 - lon_diff
                         
                     if abs(v_lat - click_lat) > 2 or lon_diff > 2:
                         continue
                         
-                    # If it's nearby, do the precise curve-of-the-earth calculation
                     dist = haversine_distance(click_lat, click_lon, v_lat, v_lon)
                     if dist < SNAP_RADIUS_MILES and dist < min_distance:
                         snapped_country = name
                         min_distance = dist
                         
         st.session_state.selected_country = snapped_country if snapped_country else raw_country
-        # --------------------------------------
 
-        if not st.session_state.selected_country:
+        if not st.session_state.selected_country and game_mode != "City Mode":
             st.session_state.message = "🌊 You clicked the ocean! Please click a landmass."
             st.session_state.message_type = "warning"
         else:
@@ -224,12 +205,10 @@ if click_data:
             
         st.rerun()
 
-# Submission Logic
+# --- SUBMISSION & SKIP LOGIC ---
 if submit_clicked:
-
     if game_mode == "City Mode":
         if st.session_state.pin_lat:
-            # Calculate distance
             actual_coords = CITIES[st.session_state.target_city]
             dist = haversine_distance(st.session_state.pin_lat, st.session_state.pin_lon, actual_coords[0], actual_coords[1])
             
@@ -242,32 +221,50 @@ if submit_clicked:
                 st.session_state.message = f"📍 {st.session_state.target_city} is over there! You were **{int(dist):,} miles** away."
                 st.session_state.message_type = "warning"
                 
-            # Send actual coords to frontend to draw the arc
             st.session_state.actual_lat = actual_coords[0]
             st.session_state.actual_lon = actual_coords[1]
-            
             st.session_state.target_city = random.choice(list(CITIES.keys()))
             st.rerun()
         else:
-            st.warning("Please drop a pin on the globe first!")
+            st.session_state.message = "Please drop a pin on the globe first!"
+            st.session_state.message_type = "warning"
+            st.rerun()
             
     else:
-      if st.session_state.selected_country:
-        if st.session_state.selected_country == st.session_state.target_country:
-            st.session_state.score += 1
-            st.session_state.message = f"🎯 **Correct!** That was indeed {st.session_state.selected_country}!"
-            st.session_state.message_type = "success"
-            st.session_state.last_correct_country = st.session_state.selected_country
-            st.session_state.target_country = random.choice(country_names)
-            st.session_state.selected_country = None
-            st.session_state.pin_lat = None
-            st.session_state.pin_lon = None
+        if st.session_state.selected_country:
+            if st.session_state.selected_country == st.session_state.target_country:
+                st.session_state.score += 1
+                st.session_state.message = f"🎯 **Correct!** That was indeed {st.session_state.selected_country}!"
+                st.session_state.message_type = "success"
+                
+                st.session_state.last_correct_country = st.session_state.selected_country
+                st.session_state.target_country = random.choice(country_names)
+                st.session_state.selected_country = None
+                st.session_state.pin_lat = None
+                st.session_state.pin_lon = None
+            else:
+                st.session_state.message = f"❌ Incorrect. You clicked {st.session_state.selected_country}."
+                st.session_state.message_type = "warning"
             st.rerun()
         else:
-            st.session_state.message = f"❌ **Incorrect.** You selected {st.session_state.selected_country}. Try again!"
-            st.session_state.message_type = "error"
+            st.session_state.message = "Please select a country first!"
+            st.session_state.message_type = "warning"
             st.rerun()
-      elif st.session_state.pin_lat:
-        st.warning("You clicked outside a recognized country. Please click inside a valid border!")
-      else:
-        st.warning("Please click a country on the globe first before submitting!")
+
+elif skip_clicked:
+    if game_mode == "City Mode":
+        st.session_state.message = f"⏭️ Skipped! The city was {st.session_state.target_city}."
+        st.session_state.message_type = "warning"
+        st.session_state.target_city = random.choice(list(CITIES.keys()))
+    else:
+        st.session_state.message = f"⏭️ Skipped! The country was {st.session_state.target_country}."
+        st.session_state.message_type = "warning"
+        st.session_state.target_country = random.choice(country_names)
+        
+    st.session_state.selected_country = None
+    st.session_state.last_correct_country = None
+    st.session_state.pin_lat = None
+    st.session_state.pin_lon = None
+    st.session_state.actual_lat = None
+    st.session_state.actual_lon = None
+    st.rerun()
