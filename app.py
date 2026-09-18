@@ -16,6 +16,25 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
+# --- CITY MODE DATA ---
+CITIES = {
+    "Tokyo, Japan": (35.6762, 139.6503),
+    "Paris, France": (48.8566, 2.3522),
+    "New York City, USA": (40.7128, -74.0060),
+    "London, UK": (51.5074, -0.1278),
+    "Sydney, Australia": (-33.8688, 151.2093),
+    "Cairo, Egypt": (30.0444, 31.2357),
+    "Rio de Janeiro, Brazil": (-22.9068, -43.1729),
+    "Mumbai, India": (19.0760, 72.8777),
+    "Cape Town, South Africa": (-33.9249, 18.4241),
+    "Moscow, Russia": (55.7558, 37.6173),
+    "Beijing, China": (39.9042, 116.4074),
+    "Buenos Aires, Argentina": (-34.6037, -58.3816),
+    "Rome, Italy": (41.9028, 12.4964),
+    "Nairobi, Kenya": (-1.2864, 36.8172),
+    "Toronto, Canada": (43.6510, -79.3470)
+}
+
 # Connect Python to HTML
 parent_dir = os.path.dirname(os.path.abspath(__file__))
 frontend_dir = os.path.join(parent_dir, "frontend")
@@ -77,23 +96,39 @@ if "pin_lat" not in st.session_state:
     st.session_state.pin_lat = None
 if "pin_lon" not in st.session_state:
     st.session_state.pin_lon = None
+if "target_city" not in st.session_state:
+    st.session_state.target_city = random.choice(list(CITIES.keys()))
+if "city_score" not in st.session_state:
+    st.session_state.city_score = 0
+if "actual_lat" not in st.session_state:
+    st.session_state.actual_lat = None
+if "actual_lon" not in st.session_state:
+    st.session_state.actual_lon = None
 
 def reset_round():
     st.session_state.target_country = random.choice(country_names)
+    st.session_state.target_city = random.choice(list(CITIES.keys()))
     st.session_state.selected_country = None
+    st.session_state.last_correct_country = None
     st.session_state.pin_lat = None
     st.session_state.pin_lon = None
+    st.session_state.actual_lat = None
+    st.session_state.actual_lon = None
     st.session_state.message = ""
 
 # UI Setup
-st.title("Geography Quiz")
+st.title("Geography Quizes")
 
-game_mode = st.selectbox("Choose Border Mode:", ["Without Borders", "With Borders"])
+game_mode = st.selectbox("Choose Game Mode:", ["With Borders", "Without Borders", "City Mode"])
 show_borders = (game_mode == "With Borders")
 
-st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
-st.markdown(f"**Score:** {st.session_state.score}")
-
+if game_mode == "City Mode":
+    st.markdown(f"### 🎯 Drop a pin on: **{st.session_state.target_city}**")
+    st.markdown(f"**Total Distance Score:** {st.session_state.city_score:,.0f} miles")
+else:
+    st.markdown(f"### 🎯 Find: **{st.session_state.target_country}**")
+    st.markdown(f"**Score:** {st.session_state.score}")
+    
 if st.session_state.message:
     if st.session_state.message_type == "success":
         st.success(st.session_state.message)
@@ -117,8 +152,10 @@ click_data = globe_component(
     show_borders=show_borders, 
     pin_lat=st.session_state.pin_lat, 
     pin_lon=st.session_state.pin_lon,
-    selected_country=st.session_state.selected_country, # <-- ADD THIS LINE
-    last_correct_country=st.session_state.last_correct_country, # <-- Add this line!
+    selected_country=st.session_state.selected_country,
+    last_correct_country=st.session_state.last_correct_country,
+    actual_lat=st.session_state.actual_lat, # NEW
+    actual_lon=st.session_state.actual_lon, # NEW
     key="globe_view",
     default=None
 )
@@ -126,7 +163,10 @@ click_data = globe_component(
 # Click Logic (with Ghost-Click prevention & Coastline Magnet)
 if click_data:
     current_click_id = click_data.get("click_id")
-    
+
+    st.session_state.actual_lat = None
+    st.session_state.actual_lon = None
+
     if current_click_id and current_click_id != st.session_state.last_click_id:
         st.session_state.last_click_id = current_click_id
         
@@ -176,7 +216,33 @@ if click_data:
 
 # Submission Logic
 if submit_clicked:
-    if st.session_state.selected_country:
+
+    if game_mode == "City Mode":
+        if st.session_state.pin_lat:
+            # Calculate distance
+            actual_coords = CITIES[st.session_state.target_city]
+            dist = haversine_distance(st.session_state.pin_lat, st.session_state.pin_lon, actual_coords[0], actual_coords[1])
+            
+            st.session_state.city_score += dist
+            
+            if dist < 100:
+                st.session_state.message = f"🎯 Incredible! You were only **{int(dist)} miles** away from {st.session_state.target_city}!"
+                st.session_state.message_type = "success"
+            else:
+                st.session_state.message = f"📍 {st.session_state.target_city} is over there! You were **{int(dist):,} miles** away."
+                st.session_state.message_type = "warning"
+                
+            # Send actual coords to frontend to draw the arc
+            st.session_state.actual_lat = actual_coords[0]
+            st.session_state.actual_lon = actual_coords[1]
+            
+            st.session_state.target_city = random.choice(list(CITIES.keys()))
+            st.rerun()
+        else:
+            st.warning("Please drop a pin on the globe first!")
+            
+    else:
+      if st.session_state.selected_country:
         if st.session_state.selected_country == st.session_state.target_country:
             st.session_state.score += 1
             st.session_state.message = f"🎯 **Correct!** That was indeed {st.session_state.selected_country}!"
@@ -191,7 +257,7 @@ if submit_clicked:
             st.session_state.message = f"❌ **Incorrect.** You selected {st.session_state.selected_country}. Try again!"
             st.session_state.message_type = "error"
             st.rerun()
-    elif st.session_state.pin_lat:
+      elif st.session_state.pin_lat:
         st.warning("You clicked outside a recognized country. Please click inside a valid border!")
-    else:
+      else:
         st.warning("Please click a country on the globe first before submitting!")
