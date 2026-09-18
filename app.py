@@ -16,24 +16,34 @@ def haversine_distance(lat1, lon1, lat2, lon2):
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
     return R * c
 
-# --- CITY MODE DATA ---
-CITIES = {
-    "Tokyo, Japan": (35.6762, 139.6503),
-    "Paris, France": (48.8566, 2.3522),
-    "New York City, USA": (40.7128, -74.0060),
-    "London, UK": (51.5074, -0.1278),
-    "Sydney, Australia": (-33.8688, 151.2093),
-    "Cairo, Egypt": (30.0444, 31.2357),
-    "Rio de Janeiro, Brazil": (-22.9068, -43.1729),
-    "Mumbai, India": (19.0760, 72.8777),
-    "Cape Town, South Africa": (-33.9249, 18.4241),
-    "Moscow, Russia": (55.7558, 37.6173),
-    "Beijing, China": (39.9042, 116.4074),
-    "Buenos Aires, Argentina": (-34.6037, -58.3816),
-    "Rome, Italy": (41.9028, 12.4964),
-    "Nairobi, Kenya": (-1.2864, 36.8172),
-    "Toronto, Canada": (43.6510, -79.3470)
-}
+@st.cache_data
+def load_cities():
+    # Natural Earth 50m Populated Places dataset
+    url = "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_populated_places_simple.geojson"
+    response = requests.get(url)
+    data = response.json()
+    
+    cities_dict = {}
+    for f in data["features"]:
+        props = f["properties"]
+        name = props.get("name")
+        country = props.get("adm0name")
+        pop = props.get("pop_max", 0)
+        
+        # Filter for major cities to keep the game playable (e.g., > 1,000,000 people)
+        # Lower this number to make the game drastically harder!
+        if pop > 10000: 
+            coords = f["geometry"]["coordinates"]
+            # GeoJSON stores as [longitude, latitude], so we flip them for your logic
+            lon, lat = coords[0], coords[1]
+            
+            # Formats as "Tokyo, Japan"
+            cities_dict[f"{name}, {country}"] = (lat, lon)
+            
+    return cities_dict
+
+# Replace the hardcoded dictionary with this function call:
+CITIES = load_cities()
 
 # Connect Python to HTML
 parent_dir = os.path.dirname(os.path.abspath(__file__))
