@@ -232,13 +232,14 @@
       // 2. Highlight the Selected Country
       globe.polygonCapColor(d => {
           const name = getCountryName(d);
-          if (args.show_borders) {
-              if (args.selected_country && name === args.selected_country) {
-                  return 'rgba(255, 215, 0, 0.6)'; // Gold for active guess
-              }
-              if (args.last_correct_country && name === args.last_correct_country) {
-                  return 'rgba(50, 255, 50, 0.6)'; // Green for previous correct answer!
-              }
+          // ALWAYS show the green highlight for a correct guess, even if borders are off!
+          if (args.last_correct_country && name === args.last_correct_country) {
+              return 'rgba(50, 255, 50, 0.6)'; // Green for previous correct answer
+          }
+          
+          // Only show the golden active guess highlight if borders are ON
+          if (args.show_borders && args.selected_country && name === args.selected_country) {
+              return 'rgba(255, 215, 0, 0.6)'; // Gold for active guess
           }
           return 'rgba(0,0,0,0)';
       });
