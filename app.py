@@ -116,25 +116,35 @@ st.markdown("""
         display: none !important;
     }
     
-    /* Remove empty space but prevent content from hitting the raw edges */
+    /* Remove empty space and strictly block horizontal page scrolling */
     .block-container {
-        padding-top: 1.5rem !important;
+        padding-top: 1rem !important;
         padding-bottom: 0rem !important;
         padding-left: 0.5rem !important;
         padding-right: 0.5rem !important;
-        overflow-x: hidden !important; /* Hard-stop any horizontal scrolling */
+        max-width: 100vw !important;
+        overflow-x: hidden !important; 
     }
     
-    /* Force columns to stay on one line AND shrink to fit the screen */
+    /* Force horizontal blocks to stay within the screen bounds */
     [data-testid="stHorizontalBlock"] {
         flex-wrap: nowrap !important;
-        gap: 0.5rem !important; 
+        width: 100% !important;
+        gap: 0.5rem !important;
     }
     
-    /* Mathematically force the buttons to share the exact screen width */
-    [data-testid="column"] {
-        flex: 1 1 0% !important;
+    /* Force columns to aggressively shrink and share exactly 50% of the space each */
+    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
+        width: 50% !important;
+        flex: 1 1 50% !important;
         min-width: 0 !important;
+        overflow: hidden !important;
+    }
+    
+    /* Slightly reduce button text size so "Submit Guess" fits on narrow phone screens */
+    [data-testid="stButton"] button p {
+        font-size: 0.9rem !important;
+        white-space: nowrap !important;
     }
     </style>
 """, unsafe_allow_html=True)
