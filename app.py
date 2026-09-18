@@ -108,76 +108,44 @@ if "last_click_id" not in st.session_state:
     st.session_state.last_click_id = None
 
 # --- UI SETUP ---
-# 1. CSS Injection for a native mobile app feel
+# 1. Minimal CSS to hide the Streamlit header and reduce top padding
 st.markdown("""
     <style>
-    /* Completely hide the Streamlit top menu bar */
     header[data-testid="stHeader"] {
         display: none !important;
     }
-    
-    /* Remove empty space and strictly block horizontal page scrolling */
     .block-container {
-        padding-top: 1rem !important;
+        padding-top: 1.5rem !important;
         padding-bottom: 0rem !important;
-        padding-left: 0.5rem !important;
-        padding-right: 0.5rem !important;
-        max-width: 100vw !important;
-        overflow-x: hidden !important; 
-    }
-    
-    /* Force horizontal blocks to stay within the screen bounds */
-    [data-testid="stHorizontalBlock"] {
-        flex-wrap: nowrap !important;
-        width: 100% !important;
-        gap: 0.5rem !important;
-    }
-    
-    /* Force columns to aggressively shrink and share exactly 50% of the space each */
-    [data-testid="stHorizontalBlock"] > [data-testid="column"] {
-        width: 50% !important;
-        flex: 1 1 50% !important;
-        min-width: 0 !important;
-        overflow: hidden !important;
-    }
-    
-    /* Slightly reduce button text size so "Submit Guess" fits on narrow phone screens */
-    [data-testid="stButton"] button p {
-        font-size: 0.9rem !important;
-        white-space: nowrap !important;
+        padding-left: 1rem !important;
+        padding-right: 1rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
 
-# 2. Top Row: Game Mode & Score (Side-by-Side)
-top_col1, top_col2 = st.columns([2, 1], vertical_alignment="center")
-with top_col1:
-    game_mode = st.selectbox(
-        "Mode:", 
-        ["With Borders", "Without Borders", "City Mode"], 
-        label_visibility="collapsed"
-    )
-with top_col2:
-    if game_mode == "City Mode":
-        st.write(f"**Score:** {st.session_state.city_score:,.0f} mi")
-    else:
-        st.write(f"**Score:** {st.session_state.score}")
-
+# 2. Game Mode Dropdown
+game_mode = st.selectbox(
+    "Mode:", 
+    ["With Borders", "Without Borders", "City Mode"], 
+    label_visibility="collapsed"
+)
 show_borders = (game_mode == "With Borders")
 
-# 3. Middle Row: The Target
+# 3. Score (Directly under the dropdown)
+if game_mode == "City Mode":
+    st.write(f"**Score:** {st.session_state.city_score:,.0f} mi")
+else:
+    st.write(f"**Score:** {st.session_state.score}")
+
+# 4. The Target Prompt
 if game_mode == "City Mode":
     st.write(f"🎯 Drop pin on: **{st.session_state.target_city}**")
 else:
     st.write(f"🎯 Find: **{st.session_state.target_country}**")
 
-# 4. Bottom Row: Action Buttons
-btn_col1, btn_col2 = st.columns(2)
-with btn_col1:
-    submit_clicked = st.button("Submit Guess", use_container_width=True, type="primary")
-with btn_col2:
-    skip_clicked = st.button("Skip", use_container_width=True)
-
+# 5. Buttons (Stacked vertically, full width for easy tapping)
+submit_clicked = st.button("Submit Guess", use_container_width=True, type="primary")
+skip_clicked = st.button("Skip", use_container_width=True)
 
 if st.session_state.message:
     if st.session_state.message_type == "success":
