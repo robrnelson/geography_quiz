@@ -127,7 +127,7 @@ def reset_round():
     st.session_state.message = ""
 
 # UI Setup
-st.title("Geography Quizes")
+#st.title("Geography Quizes")
 
 game_mode = st.selectbox("Choose Game Mode:", ["With Borders", "Without Borders", "City Mode"])
 show_borders = (game_mode == "With Borders")
