@@ -137,6 +137,20 @@ st.markdown("""
         padding-bottom: 0.25rem !important;
         font-size: 0.9rem !important;
     }
+    /* Streamlit stacks st.columns vertically by default below a mobile
+       breakpoint, which is exactly what we don't want here - override its
+       responsive behavior to force the two button columns to always stay
+       side by side, regardless of screen width. */
+    div[data-testid="stHorizontalBlock"] {
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        gap: 0.5rem !important;
+    }
+    div[data-testid="stColumn"] {
+        width: 50% !important;
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+    }
     </style>
 """, unsafe_allow_html=True)
 
