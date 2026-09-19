@@ -39,6 +39,23 @@
     setFrameHeight(600);
 
     const getCountryName = (d) => d.properties.ADMIN || d.properties.name;
+
+    // Coarse pointer = touch-primary device (phones/tablets), a more
+    // reliable signal than screen width or user-agent sniffing (a touch
+    // laptop with a big screen should still get full quality; a narrow
+    // desktop window shouldn't get downgraded).
+    const isMobile = window.matchMedia('(pointer: coarse)').matches;
+
+    // Two textures per look (normal/bordered): a full one for capable
+    // devices, and a pre-shrunk one for mobile. Mobile GPUs commonly cap
+    // WebGL's max texture size well below desktop (4096-8192px vs 16384),
+    // so an oversized texture gets silently downsampled at the last
+    // second using whatever crude resize the browser falls back to -
+    // noticeably softer than deliberately downsizing with a good filter
+    // ahead of time. See bake_borders.py / a simple PIL resize to produce
+    // these two extra files if they don't exist yet.
+    const TEXTURE_NORMAL = isMobile ? './earth-highres-mobile.jpg' : './earth-highres.jpg';
+    const TEXTURE_BORDERED = isMobile ? './earth-highres-bordered-mobile.jpg' : './earth-highres-bordered.jpg';
     
     // ---- TRUE 3D WEBGL GLOBE LOGIC ----
     let globe;
@@ -52,18 +69,31 @@
         }
 
         try {
-            globe = Globe()(document.getElementById('globeViz'))
+            globe = Globe({
+                // Antialiasing is a major GPU cost on weaker/high-DPI
+                // devices for comparatively little visual gain (it only
+                // smooths polygon edges, not the texture itself) - a widely
+                // cited real-world finding (Stripe's globe engineering
+                // write-up) when chasing exactly this kind of lag.
+                rendererConfig: { antialias: !isMobile, alpha: true },
+              })(document.getElementById('globeViz'))
               .showGlobe(true)
               .showAtmosphere(false)
-              .globeImageUrl('./earth-highres.jpg') 
+              .globeImageUrl(TEXTURE_NORMAL) 
               .backgroundColor('rgba(0,0,0,0)')
               .polygonAltitude(0.0008)
-              .polygonCapCurvatureResolution(1)
+              // Finer curvature tessellation keeps large countries (Russia,
+              // Canada, etc.) from sinking below the surface at near-zero
+              // altitude, but it applies to every one of the ~250 country
+              // polygons, not just the big ones - a real triangle-count
+              // cost on mobile GPUs. Trading a little of that visual
+              // correctness for a lot of performance there.
+              .polygonCapCurvatureResolution(isMobile ? 4 : 1)
               .polygonCapColor(() => 'rgba(0,0,0,0)')
               .polygonSideColor(() => 'rgba(0,0,0,0)')
               .polygonStrokeColor(() => 'rgba(0,0,0,0)');
 
-            globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio, 1.2));
+            globe.renderer().setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.0 : 1.2));
           
             fetch('https://raw.githubusercontent.com/nvkelso/natural-earth-vector/master/geojson/ne_50m_admin_0_countries.geojson')
               .then(res => res.json())
@@ -192,9 +222,9 @@
 
       // 1. Swap the Background Texture
       if (args.show_borders) {
-          globe.globeImageUrl('./earth-highres-bordered.jpg');
+          globe.globeImageUrl(TEXTURE_BORDERED);
       } else {
-          globe.globeImageUrl('./earth-highres.jpg'); 
+          globe.globeImageUrl(TEXTURE_NORMAL); 
       }
 
       // 2. Highlight the Selected Country
