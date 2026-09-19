@@ -129,7 +129,7 @@ st.markdown("""
        than guessing at the exact DOM structure. Streamlit gives each one a
        default top margin; shrinking it is most of the wasted vertical
        space on a short mobile screen, not the elements' own heights. */
-    div[data-testid="element-container"] {
+    div[data-testid="stElementContainer"] {
         margin-bottom: 0.25rem !important;
     }
     div[data-testid="stButton"] > button {
