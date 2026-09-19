@@ -88,7 +88,7 @@
               // polygons, not just the big ones - a real triangle-count
               // cost on mobile GPUs. Trading a little of that visual
               // correctness for a lot of performance there.
-              .polygonCapCurvatureResolution(isMobile ? 4 : 1)
+              .polygonCapCurvatureResolution(isMobile ? 2 : 1)
               .polygonCapColor(() => 'rgba(0,0,0,0)')
               .polygonSideColor(() => 'rgba(0,0,0,0)')
               .polygonStrokeColor(() => 'rgba(0,0,0,0)');
