@@ -108,17 +108,34 @@ if "last_click_id" not in st.session_state:
     st.session_state.last_click_id = None
 
 # --- UI SETUP ---
-# 1. Minimal CSS to hide the Streamlit header and reduce top padding
+# 1. Minimal CSS to hide the Streamlit header, tighten padding around every
+# element (Streamlit gives each st.write/st.button its own vertical margin
+# by default - this is most of the wasted space on a short mobile screen,
+# not the elements' own heights), and shrink the button/selectbox font a
+# touch so more of the screen goes to the globe.
 st.markdown("""
     <style>
     header[data-testid="stHeader"] {
         display: none !important;
     }
     .block-container {
-        padding-top: 1.5rem !important;
+        padding-top: 0.75rem !important;
         padding-bottom: 0rem !important;
-        padding-left: 1rem !important;
-        padding-right: 1rem !important;
+        padding-left: 0.75rem !important;
+        padding-right: 0.75rem !important;
+    }
+    /* every element Streamlit renders gets wrapped in a div with this
+       testid, regardless of nesting depth - a more version-stable target
+       than guessing at the exact DOM structure. Streamlit gives each one a
+       default top margin; shrinking it is most of the wasted vertical
+       space on a short mobile screen, not the elements' own heights. */
+    div[data-testid="element-container"] {
+        margin-bottom: 0.25rem !important;
+    }
+    div[data-testid="stButton"] > button {
+        padding-top: 0.25rem !important;
+        padding-bottom: 0.25rem !important;
+        font-size: 0.9rem !important;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -131,21 +148,36 @@ game_mode = st.selectbox(
 )
 show_borders = (game_mode == "With Borders")
 
-# 3. Score (Directly under the dropdown)
+# 3/4. Score + target combined onto a single line (was two separate
+# st.write calls, each carrying its own margin) - a flex row with the
+# target on the left and score on the right uses the width of the
+# screen instead of stacking, saving a full line of vertical space.
 if game_mode == "City Mode":
-    st.write(f"**Score:** {st.session_state.city_score:,.0f} mi")
+    target_html = f"🎯 Drop pin on: <b>{st.session_state.target_city}</b>"
+    score_html = f"<b>{st.session_state.city_score:,.0f}</b> mi"
 else:
-    st.write(f"**Score:** {st.session_state.score}")
+    target_html = f"🎯 Find: <b>{st.session_state.target_country}</b>"
+    score_html = f"<b>{st.session_state.score}</b>"
 
-# 4. The Target Prompt
-if game_mode == "City Mode":
-    st.write(f"🎯 Drop pin on: **{st.session_state.target_city}**")
-else:
-    st.write(f"🎯 Find: **{st.session_state.target_country}**")
+st.markdown(
+    f"""
+    <div style="display:flex; justify-content:space-between; align-items:baseline;
+                font-size:0.95rem; margin-bottom:0.25rem;">
+        <span>{target_html}</span>
+        <span>Score: {score_html}</span>
+    </div>
+    """,
+    unsafe_allow_html=True,
+)
 
-# 5. Buttons (Stacked vertically, full width for easy tapping)
-submit_clicked = st.button("Submit Guess", use_container_width=True, type="primary")
-skip_clicked = st.button("Skip", use_container_width=True)
+# 5. Buttons side by side instead of stacked - each takes half the row.
+# gap="small" trims the default spacing Streamlit puts between columns,
+# which matters more than it sounds like on a narrow phone screen.
+btn_col1, btn_col2 = st.columns(2, gap="small")
+with btn_col1:
+    submit_clicked = st.button("Submit Guess", use_container_width=True, type="primary")
+with btn_col2:
+    skip_clicked = st.button("Skip", use_container_width=True)
 
 if st.session_state.message:
     if st.session_state.message_type == "success":
